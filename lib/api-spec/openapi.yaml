@@ -3,13 +3,17 @@ info:
   # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: API specification
+  description: InvoiceBridge API — US invoice to Indian GST conversion
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
     description: Health operations
+  - name: invoices
+    description: Invoice management
+  - name: upload
+    description: File upload
 paths:
   /healthz:
     get:
@@ -24,6 +28,154 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  /invoices:
+    get:
+      operationId: listInvoices
+      tags: [invoices]
+      summary: List all invoices with stats
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 10
+        - name: status
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: List of invoices with pagination and stats
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InvoiceListResponse"
+
+  /invoices/{id}:
+    get:
+      operationId: getInvoice
+      tags: [invoices]
+      summary: Get a single invoice by ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Invoice details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Invoice"
+        "404":
+          description: Not found
+    delete:
+      operationId: deleteInvoice
+      tags: [invoices]
+      summary: Delete an invoice
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: Deleted
+
+  /invoices/{id}/extract:
+    post:
+      operationId: saveExtractedData
+      tags: [invoices]
+      summary: Save extracted OCR data for an invoice
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ExtractedDataInput"
+      responses:
+        "200":
+          description: Extracted data saved
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Invoice"
+
+  /invoices/{id}/convert:
+    post:
+      operationId: convertInvoice
+      tags: [invoices]
+      summary: Convert invoice to GST format and generate PDF
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ConversionInput"
+      responses:
+        "200":
+          description: Conversion result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConversionResult"
+
+  /invoices/{id}/download:
+    get:
+      operationId: downloadInvoicePdf
+      tags: [invoices]
+      summary: Download the converted GST PDF
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: PDF file
+          content:
+            application/pdf:
+              schema:
+                type: string
+                format: binary
+        "404":
+          description: Not found
+
+  /invoices/stats:
+    get:
+      operationId: getInvoiceStats
+      tags: [invoices]
+      summary: Get aggregate stats
+      responses:
+        "200":
+          description: Aggregate stats
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InvoiceStats"
+
 components:
   schemas:
     HealthStatus:
@@ -34,3 +186,160 @@ components:
       required:
         - status
 
+    Invoice:
+      type: object
+      properties:
+        id:
+          type: string
+        fileName:
+          type: ["string", "null"]
+        filePath:
+          type: ["string", "null"]
+        status:
+          type: string
+        originalAmount:
+          type: number
+        originalCurrency:
+          type: string
+        extractedData:
+          type: ["object", "null"]
+        createdAt:
+          type: string
+        updatedAt:
+          type: string
+        converted:
+          $ref: "#/components/schemas/ConvertedInvoice"
+      required:
+        - id
+        - status
+        - originalAmount
+        - originalCurrency
+        - createdAt
+        - updatedAt
+
+    ConvertedInvoice:
+      type: object
+      properties:
+        id:
+          type: string
+        invoiceId:
+          type: string
+        inrAmount:
+          type: number
+        cgstAmount:
+          type: number
+        sgstAmount:
+          type: number
+        igstAmount:
+          type: number
+        gstRate:
+          type: number
+        exchangeRate:
+          type: number
+        convertedData:
+          type: object
+        pdfPath:
+          type: ["string", "null"]
+        processedAt:
+          type: string
+      required:
+        - id
+        - invoiceId
+        - inrAmount
+        - cgstAmount
+        - sgstAmount
+        - igstAmount
+        - gstRate
+        - exchangeRate
+        - convertedData
+        - processedAt
+
+    UploadResult:
+      type: object
+      properties:
+        invoiceId:
+          type: string
+        filePath:
+          type: ["string", "null"]
+        fileName:
+          type: ["string", "null"]
+      required:
+        - invoiceId
+
+    ExtractedDataInput:
+      type: object
+      properties:
+        extractedData:
+          type: object
+      required:
+        - extractedData
+
+    ConversionInput:
+      type: object
+      properties:
+        extractedData:
+          type: object
+        conversionOptions:
+          type: object
+      required:
+        - extractedData
+        - conversionOptions
+
+    ConversionResult:
+      type: object
+      properties:
+        convertedInvoiceId:
+          type: string
+        pdfPath:
+          type: ["string", "null"]
+        convertedData:
+          type: object
+      required:
+        - convertedInvoiceId
+        - convertedData
+
+    InvoiceListResponse:
+      type: object
+      properties:
+        invoices:
+          type: array
+          items:
+            $ref: "#/components/schemas/Invoice"
+        pagination:
+          type: object
+          properties:
+            page:
+              type: integer
+            limit:
+              type: integer
+            totalCount:
+              type: integer
+            totalPages:
+              type: integer
+          required: [page, limit, totalCount, totalPages]
+        stats:
+          $ref: "#/components/schemas/InvoiceStats"
+      required:
+        - invoices
+        - pagination
+        - stats
+
+    InvoiceStats:
+      type: object
+      properties:
+        totalInvoices:
+          type: integer
+        totalConverted:
+          type: integer
+        totalAmountProcessed:
+          type: number
+        thisMonthConversions:
+          type: integer
+        successRate:
+          type: integer
+      required:
+        - totalInvoices
+        - totalConverted
+        - totalAmountProcessed
+        - thisMonthConversions
+        - successRate
