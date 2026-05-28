@@ -5,6 +5,7 @@ import { eq, desc, count, and } from "drizzle-orm";
 import { convertInvoice, type ExtractedInvoice, type ConversionOptions } from "../lib/converter";
 import { generateGSTInvoicePDF } from "../lib/pdf";
 import { saveUploadedFile, saveConvertedPDF, readConvertedPDF } from "../lib/file-storage";
+import { sendInvoiceEmail } from "../lib/email";
 import { requireAuth } from "../middlewares/requireAuth";
 
 const router = Router();
@@ -263,6 +264,53 @@ router.get("/:id/download", async (req: Request, res: Response): Promise<void> =
   } catch (err) {
     req.log.error({ err }, "Download error");
     res.status(404).json({ error: "PDF not found" });
+  }
+});
+
+// POST /api/invoices/:id/send-email
+router.post("/:id/send-email", async (req: Request, res: Response): Promise<void> => {
+  const id = paramId(req);
+  try {
+    const { recipientEmail, subject, message } = req.body as {
+      recipientEmail: string;
+      subject?: string;
+      message?: string;
+    };
+
+    if (!recipientEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(recipientEmail)) {
+      res.status(400).json({ error: "Valid recipient email is required" });
+      return;
+    }
+
+    const invoice = await db.query.invoicesTable.findFirst({
+      where: and(eq(invoicesTable.id, id), eq(invoicesTable.userId, req.userId)),
+      with: { converted: true },
+    });
+
+    const converted = (invoice as any)?.converted as { convertedData: unknown } | null | undefined;
+    if (!invoice || !converted) {
+      res.status(404).json({ error: "Converted invoice not found" });
+      return;
+    }
+
+    const pdfBuffer = await readConvertedPDF(invoice.id);
+    const convertedData = converted.convertedData as Record<string, unknown>;
+    const invoiceNumber = String(convertedData["invoiceNumber"] ?? "GST-Invoice");
+
+    await sendInvoiceEmail({
+      recipientEmail,
+      subject: subject || `Converted GST Invoice — ${invoiceNumber}`,
+      message: message || "",
+      invoiceId: invoice.id,
+      convertedData,
+      pdfBuffer,
+      fileName: `${invoiceNumber}.pdf`,
+    });
+
+    res.json({ success: true });
+  } catch (err: any) {
+    req.log.error({ err }, "Send email error");
+    res.status(500).json({ error: err.message || "Failed to send email" });
   }
 });
 

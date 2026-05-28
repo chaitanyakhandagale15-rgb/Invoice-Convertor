@@ -1,16 +1,21 @@
+import { useState } from "react";
 import { useParams } from "wouter";
 import { useGetInvoice } from "@workspace/api-client-react";
 import { Link } from "wouter";
-import { CheckCircle, Download, Upload, LayoutDashboard, Loader2, AlertCircle } from "lucide-react";
+import { CheckCircle, Download, Upload, LayoutDashboard, Loader2, AlertCircle, Mail } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
-import { formatINR, formatUSD } from "@/lib/types";
+import { formatINR } from "@/lib/types";
+import { getSourceCountry } from "@/lib/types";
+import type { SourceCountry } from "@/lib/types";
 import { motion } from "framer-motion";
+import { SendEmailModal } from "@/components/SendEmailModal";
 
 export function DownloadPage() {
   const { id } = useParams<{ id: string }>();
   const { data: invoice, isLoading } = useGetInvoice(id);
+  const [emailOpen, setEmailOpen] = useState(false);
 
   if (isLoading) return (
     <div className="flex items-center justify-center min-h-[60vh]">
@@ -27,6 +32,8 @@ export function DownloadPage() {
 
   const converted = (invoice as any).converted;
   const convertedData = converted?.convertedData;
+  const sourceCountry = (convertedData?.sourceCountry ?? (invoice as any).sourceCountry ?? "US") as SourceCountry;
+  const countryInfo = getSourceCountry(sourceCountry);
 
   return (
     <div className="max-w-2xl mx-auto px-4 py-12">
@@ -45,13 +52,23 @@ export function DownloadPage() {
           <CheckCircle className="w-10 h-10 text-green-600" />
         </motion.div>
         <h1 className="text-3xl font-bold mb-2">Invoice Converted!</h1>
-        <p className="text-muted-foreground">Your GST-compliant invoice is ready to download</p>
+        <p className="text-muted-foreground">Your GST-compliant invoice is ready to download or send</p>
       </motion.div>
 
       <Card className="mb-6">
         <CardContent className="p-6 space-y-4">
           {convertedData && (
             <>
+              {/* Conversion route */}
+              <div className="flex items-center justify-center gap-2 text-sm font-medium text-muted-foreground bg-muted/50 rounded-lg px-4 py-2.5">
+                <span>{countryInfo.flag}</span>
+                <span>{countryInfo.currency}</span>
+                <span className="text-xs">({countryInfo.taxSystemName})</span>
+                <span>→</span>
+                <span>🇮🇳</span>
+                <span>INR (GST)</span>
+              </div>
+
               <div className="grid grid-cols-2 gap-4 text-sm">
                 <div>
                   <p className="text-muted-foreground text-xs mb-1">GST Invoice No.</p>
@@ -67,7 +84,7 @@ export function DownloadPage() {
                 </div>
                 <div>
                   <p className="text-muted-foreground text-xs mb-1">Exchange Rate</p>
-                  <p className="font-semibold">1 USD = ₹{convertedData.exchangeRate}</p>
+                  <p className="font-semibold">1 {countryInfo.currency} = ₹{convertedData.exchangeRate}</p>
                 </div>
               </div>
 
@@ -76,7 +93,7 @@ export function DownloadPage() {
               <div className="space-y-2 text-sm">
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Original Amount</span>
-                  <span>{formatUSD(convertedData.originalTotal)}</span>
+                  <span>{countryInfo.currencySymbol}{Number(convertedData.originalTotal).toFixed(2)}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Taxable Value (INR)</span>
@@ -124,6 +141,15 @@ export function DownloadPage() {
           </Button>
         </a>
 
+        <Button
+          variant="outline"
+          className="w-full h-11 gap-2 border-primary/30 text-primary hover:bg-primary/5"
+          onClick={() => setEmailOpen(true)}
+        >
+          <Mail className="w-4 h-4" />
+          Send by Email
+        </Button>
+
         <div className="grid grid-cols-2 gap-3">
           <Link href="/upload">
             <Button variant="outline" className="w-full gap-2">
@@ -137,6 +163,12 @@ export function DownloadPage() {
           </Link>
         </div>
       </div>
+
+      <SendEmailModal
+        invoiceId={id}
+        open={emailOpen}
+        onClose={() => setEmailOpen(false)}
+      />
     </div>
   );
 }
