@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useParams, useLocation } from "wouter";
 import { useGetInvoice, useConvertInvoice } from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
@@ -9,10 +9,33 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { FileDown, Plus, Trash2, Loader2, AlertCircle } from "lucide-react";
-import { INDIAN_STATES, GST_RATES, DEFAULT_CONVERSION_OPTIONS, formatINR, formatUSD } from "@/lib/types";
+import { FileDown, Plus, Trash2, Loader2, AlertCircle, RefreshCw, Wifi, WifiOff, Globe } from "lucide-react";
+import {
+  INDIAN_STATES, GST_RATES, DEFAULT_CONVERSION_OPTIONS,
+  SOURCE_COUNTRIES, getSourceCountry,
+  formatINR, formatCurrency,
+  type SourceCountry,
+} from "@/lib/types";
 import type { ExtractedInvoice, ConversionOptions, LineItem } from "@/lib/types";
 import { toast } from "sonner";
+
+const BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
+
+interface LiveRate {
+  rate: number;
+  live: boolean;
+  timestamp: string;
+}
+
+async function fetchExchangeRate(currency: string): Promise<LiveRate | null> {
+  try {
+    const res = await fetch(`${BASE}/api/exchange-rates/${currency}`);
+    if (!res.ok) return null;
+    return await res.json();
+  } catch {
+    return null;
+  }
+}
 
 export function Convert() {
   const { id } = useParams<{ id: string }>();
@@ -23,19 +46,47 @@ export function Convert() {
 
   const [extracted, setExtracted] = useState<ExtractedInvoice | null>(null);
   const [options, setOptions] = useState<ConversionOptions>(DEFAULT_CONVERSION_OPTIONS);
+  const [liveRate, setLiveRate] = useState<LiveRate | null>(null);
+  const [rateLoading, setRateLoading] = useState(false);
+  const [rateOverride, setRateOverride] = useState(false);
+
+  const sourceCountry: SourceCountry = extracted?.sourceCountry ?? options.sourceCountry ?? "US";
+  const countryInfo = getSourceCountry(sourceCountry);
+
+  const loadLiveRate = useCallback(async (currency: string) => {
+    setRateLoading(true);
+    const rate = await fetchExchangeRate(currency);
+    setRateLoading(false);
+    if (rate) {
+      setLiveRate(rate);
+      if (!rateOverride) {
+        setOptions((prev) => ({ ...prev, exchangeRate: rate.rate }));
+      }
+    }
+  }, [rateOverride]);
 
   useEffect(() => {
     if (invoice?.extractedData) {
-      setExtracted(invoice.extractedData as unknown as ExtractedInvoice);
+      const data = invoice.extractedData as unknown as ExtractedInvoice;
+      setExtracted(data);
+      const country = data.sourceCountry ?? "US";
+      const info = getSourceCountry(country);
+      setOptions((prev) => ({ ...prev, sourceCountry: country }));
+      loadLiveRate(info.currency);
     }
-  }, [invoice]);
+  }, [invoice, loadLiveRate]);
+
+  // Reload live rate when source country changes
+  useEffect(() => {
+    loadLiveRate(countryInfo.currency);
+  }, [sourceCountry, loadLiveRate, countryInfo.currency]);
 
   const updateLineItem = (index: number, field: keyof LineItem, value: string | number) => {
     if (!extracted) return;
     const items = [...extracted.lineItems];
     items[index] = { ...items[index], [field]: value };
     if (field === "quantity" || field === "unitPrice") {
-      items[index].amount = items[index].quantity * items[index].unitPrice;
+      items[index]!.amount = items[index]!.quantity * items[index]!.unitPrice;
     }
     setExtracted({ ...extracted, lineItems: items });
   };
@@ -55,6 +106,19 @@ export function Convert() {
     setExtracted({ ...extracted, lineItems: items });
   };
 
+  const handleSourceCountryChange = (country: SourceCountry) => {
+    const info = getSourceCountry(country);
+    setExtracted((prev) => prev ? { ...prev, sourceCountry: country, currency: info.currency } : prev);
+    setOptions((prev) => ({ ...prev, sourceCountry: country }));
+    setRateOverride(false);
+    loadLiveRate(info.currency);
+  };
+
+  const handleStateChange = (stateName: string) => {
+    const state = INDIAN_STATES.find((s) => s.name === stateName);
+    setOptions({ ...options, placeOfSupply: stateName, stateCode: state?.code ?? "" });
+  };
+
   const subtotal = extracted?.lineItems.reduce((s, i) => s + i.amount, 0) ?? 0;
   const subtotalINR = subtotal * options.exchangeRate;
   const isInterState = options.supplyType === "inter-state";
@@ -69,8 +133,8 @@ export function Convert() {
       await convertMutation.mutateAsync({
         id,
         data: {
-          extractedData: extracted as any,
-          conversionOptions: options as any,
+          extractedData: { ...extracted, sourceCountry } as any,
+          conversionOptions: { ...options, sourceCountry } as any,
         },
       });
       toast.success("Invoice converted successfully!");
@@ -78,11 +142,6 @@ export function Convert() {
     } catch (err: any) {
       toast.error(err?.message || "Conversion failed. Please try again.");
     }
-  };
-
-  const handleStateChange = (stateName: string) => {
-    const state = INDIAN_STATES.find((s) => s.name === stateName);
-    setOptions({ ...options, placeOfSupply: stateName, stateCode: state?.code ?? "" });
   };
 
   if (isLoading) return (
@@ -118,6 +177,41 @@ export function Convert() {
       <div className="grid lg:grid-cols-5 gap-6">
         {/* Left: Extracted data */}
         <div className="lg:col-span-3 space-y-4">
+          {/* Source Country Card */}
+          <Card className="border-blue-200 bg-blue-50/50">
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <Globe className="w-5 h-5 text-blue-600" />
+                  <div>
+                    <p className="text-xs text-muted-foreground font-medium">Conversion Route</p>
+                    <p className="font-semibold text-sm">
+                      {countryInfo.flag} {countryInfo.name} → 🇮🇳 India
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {countryInfo.taxSystemName} ({countryInfo.currency}) → Indian GST
+                    </p>
+                  </div>
+                </div>
+                <Select value={sourceCountry} onValueChange={(v) => handleSourceCountryChange(v as SourceCountry)}>
+                  <SelectTrigger className="w-44 bg-white">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {SOURCE_COUNTRIES.map((c) => (
+                      <SelectItem key={c.code} value={c.code}>
+                        <span className="flex items-center gap-2">
+                          <span>{c.flag}</span>
+                          <span className="font-medium">{c.name}</span>
+                        </span>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </CardContent>
+          </Card>
+
           {/* Invoice info */}
           <Card>
             <CardHeader><CardTitle className="text-base">Invoice Information</CardTitle></CardHeader>
@@ -174,7 +268,7 @@ export function Convert() {
           {/* Line items */}
           <Card>
             <CardHeader className="flex flex-row items-center justify-between">
-              <CardTitle className="text-base">Line Items</CardTitle>
+              <CardTitle className="text-base">Line Items ({countryInfo.currencySymbol})</CardTitle>
               <Button variant="outline" size="sm" onClick={addLineItem} className="gap-1">
                 <Plus className="w-3 h-3" /> Add Row
               </Button>
@@ -188,8 +282,8 @@ export function Convert() {
                       <th className="pb-2 pr-3">Description</th>
                       <th className="pb-2 pr-3 w-20">HSN</th>
                       <th className="pb-2 pr-3 w-16">Qty</th>
-                      <th className="pb-2 pr-3 w-24">Unit Price ($)</th>
-                      <th className="pb-2 pr-3 w-24">Amount ($)</th>
+                      <th className="pb-2 pr-3 w-28">Unit ({countryInfo.currencySymbol})</th>
+                      <th className="pb-2 pr-3 w-28">Amount ({countryInfo.currencySymbol})</th>
                       <th className="pb-2 w-8"></th>
                     </tr>
                   </thead>
@@ -209,7 +303,9 @@ export function Convert() {
                         <td className="py-2 pr-3">
                           <Input type="number" value={item.unitPrice} onChange={(e) => updateLineItem(i, "unitPrice", parseFloat(e.target.value) || 0)} className="h-8 text-sm w-24" />
                         </td>
-                        <td className="py-2 pr-3 text-right font-medium">{formatUSD(item.amount)}</td>
+                        <td className="py-2 pr-3 text-right font-medium">
+                          {formatCurrency(item.amount, countryInfo.currencySymbol)}
+                        </td>
                         <td className="py-2">
                           <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-destructive" onClick={() => removeLineItem(i)}>
                             <Trash2 className="w-4 h-4" />
@@ -221,7 +317,7 @@ export function Convert() {
                 </table>
               </div>
               <div className="text-right pt-4 font-semibold">
-                Subtotal: {formatUSD(subtotal)}
+                Subtotal: {formatCurrency(subtotal, countryInfo.currencySymbol)}
               </div>
             </CardContent>
           </Card>
@@ -232,14 +328,51 @@ export function Convert() {
           <Card>
             <CardHeader><CardTitle className="text-base">Conversion Settings</CardTitle></CardHeader>
             <CardContent className="space-y-4">
+              {/* Live Exchange Rate */}
               <div>
-                <Label className="text-xs text-muted-foreground mb-1 block">Exchange Rate (1 USD = ? INR)</Label>
+                <div className="flex items-center justify-between mb-1">
+                  <Label className="text-xs text-muted-foreground">
+                    Exchange Rate (1 {countryInfo.currency} = ? INR)
+                  </Label>
+                  <button
+                    type="button"
+                    onClick={() => { setRateOverride(false); loadLiveRate(countryInfo.currency); }}
+                    className="flex items-center gap-1 text-xs text-primary hover:underline"
+                    disabled={rateLoading}
+                  >
+                    <RefreshCw className={`w-3 h-3 ${rateLoading ? "animate-spin" : ""}`} />
+                    Refresh
+                  </button>
+                </div>
                 <Input
                   type="number"
                   value={options.exchangeRate}
-                  onChange={(e) => setOptions({ ...options, exchangeRate: parseFloat(e.target.value) || 83 })}
+                  onChange={(e) => {
+                    setRateOverride(true);
+                    setOptions({ ...options, exchangeRate: parseFloat(e.target.value) || countryInfo.fallbackRate });
+                  }}
                 />
+                <div className="flex items-center gap-1.5 mt-1.5">
+                  {rateLoading ? (
+                    <span className="text-xs text-muted-foreground flex items-center gap-1">
+                      <Loader2 className="w-3 h-3 animate-spin" /> Fetching live rate...
+                    </span>
+                  ) : liveRate ? (
+                    <>
+                      {liveRate.live ? (
+                        <Wifi className="w-3 h-3 text-green-500" />
+                      ) : (
+                        <WifiOff className="w-3 h-3 text-orange-400" />
+                      )}
+                      <span className={`text-xs ${liveRate.live ? "text-green-600" : "text-orange-500"}`}>
+                        {liveRate.live ? "Live rate" : "Fallback rate"}: 1 {countryInfo.currency} = ₹{liveRate.rate.toFixed(2)}
+                        {rateOverride && " (overridden)"}
+                      </span>
+                    </>
+                  ) : null}
+                </div>
               </div>
+
               <div>
                 <Label className="text-xs text-muted-foreground mb-1 block">GST Rate (%)</Label>
                 <Select
@@ -301,11 +434,16 @@ export function Convert() {
 
           {/* Live summary */}
           <Card className="border-primary/20 bg-primary/5">
-            <CardHeader><CardTitle className="text-base">Conversion Summary</CardTitle></CardHeader>
+            <CardHeader>
+              <CardTitle className="text-base">Conversion Summary</CardTitle>
+              <p className="text-xs text-muted-foreground mt-1">
+                {countryInfo.flag} {countryInfo.currency} → 🇮🇳 INR · {countryInfo.taxSystemName} → Indian GST
+              </p>
+            </CardHeader>
             <CardContent className="space-y-3 text-sm">
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Original Amount</span>
-                <span className="font-medium">{formatUSD(subtotal)}</span>
+                <span className="font-medium">{formatCurrency(subtotal, countryInfo.currencySymbol)}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Converted Subtotal</span>
@@ -335,7 +473,7 @@ export function Convert() {
                 <span>₹{formatINR(grandTotal)}</span>
               </div>
               <div className="text-xs text-muted-foreground">
-                Rate: 1 USD = ₹{options.exchangeRate}
+                Rate: 1 {countryInfo.currency} = ₹{options.exchangeRate.toFixed(2)}
               </div>
             </CardContent>
           </Card>

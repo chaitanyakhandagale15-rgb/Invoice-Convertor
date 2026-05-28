@@ -117,6 +117,7 @@ router.post("/", upload.single("file"), async (req: Request, res: Response): Pro
       userId: req.userId,
       fileName: file.originalname,
       status: "UPLOADED",
+      sourceCountry: "US",
     }).returning();
 
     const filePath = await saveUploadedFile(file.buffer, file.originalname, invoice.id);
@@ -166,7 +167,7 @@ router.delete("/:id", async (req: Request, res: Response): Promise<void> => {
 router.post("/:id/extract", async (req: Request, res: Response): Promise<void> => {
   const id = paramId(req);
   try {
-    const { extractedData } = req.body as { extractedData: unknown };
+    const { extractedData, sourceCountry } = req.body as { extractedData: unknown; sourceCountry?: string };
     if (!extractedData) {
       res.status(400).json({ error: "Missing extractedData" });
       return;
@@ -177,6 +178,7 @@ router.post("/:id/extract", async (req: Request, res: Response): Promise<void> =
       status: "EXTRACTED",
       originalAmount: (extractedData as any).total || 0,
       originalCurrency: (extractedData as any).currency || "USD",
+      sourceCountry: (extractedData as any).sourceCountry || sourceCountry || "US",
       updatedAt: new Date(),
     }).where(and(eq(invoicesTable.id, id), eq(invoicesTable.userId, req.userId))).returning();
 

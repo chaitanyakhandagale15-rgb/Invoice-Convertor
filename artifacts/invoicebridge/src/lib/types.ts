@@ -1,3 +1,27 @@
+export type SourceCountry = "US" | "UK" | "EU" | "CA" | "AU";
+
+export interface SourceCountryInfo {
+  code: SourceCountry;
+  name: string;
+  currency: string;
+  currencySymbol: string;
+  taxSystemName: string;
+  flag: string;
+  fallbackRate: number;
+}
+
+export const SOURCE_COUNTRIES: SourceCountryInfo[] = [
+  { code: "US", name: "United States", currency: "USD", currencySymbol: "$", taxSystemName: "Sales Tax", flag: "🇺🇸", fallbackRate: 83 },
+  { code: "UK", name: "United Kingdom", currency: "GBP", currencySymbol: "£", taxSystemName: "VAT", flag: "🇬🇧", fallbackRate: 105 },
+  { code: "EU", name: "European Union", currency: "EUR", currencySymbol: "€", taxSystemName: "VAT", flag: "🇪🇺", fallbackRate: 90 },
+  { code: "CA", name: "Canada", currency: "CAD", currencySymbol: "CA$", taxSystemName: "GST/HST", flag: "🇨🇦", fallbackRate: 61 },
+  { code: "AU", name: "Australia", currency: "AUD", currencySymbol: "A$", taxSystemName: "GST", flag: "🇦🇺", fallbackRate: 55 },
+];
+
+export function getSourceCountry(code: SourceCountry): SourceCountryInfo {
+  return SOURCE_COUNTRIES.find((c) => c.code === code) ?? SOURCE_COUNTRIES[0]!;
+}
+
 export interface LineItem {
   sno: number;
   description: string;
@@ -24,6 +48,7 @@ export interface ExtractedInvoice {
   taxRate: number;
   total: number;
   currency: string;
+  sourceCountry?: SourceCountry;
 }
 
 export interface ConversionOptions {
@@ -34,6 +59,7 @@ export interface ConversionOptions {
   buyerGSTIN: string;
   placeOfSupply: string;
   stateCode: string;
+  sourceCountry?: SourceCountry;
 }
 
 export const INDIAN_STATES: { name: string; code: string }[] = [
@@ -86,6 +112,7 @@ export const DEFAULT_CONVERSION_OPTIONS: ConversionOptions = {
   buyerGSTIN: "",
   placeOfSupply: "Maharashtra",
   stateCode: "27",
+  sourceCountry: "US",
 };
 
 export type InvoiceStatus = "UPLOADED" | "EXTRACTING" | "EXTRACTED" | "CONVERTING" | "CONVERTED" | "FAILED";
@@ -95,6 +122,13 @@ export function formatINR(amount: number): string {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   }).format(amount);
+}
+
+export function formatCurrency(amount: number, symbol: string): string {
+  return `${symbol}${new Intl.NumberFormat("en-US", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(amount)}`;
 }
 
 export function formatUSD(amount: number): string {

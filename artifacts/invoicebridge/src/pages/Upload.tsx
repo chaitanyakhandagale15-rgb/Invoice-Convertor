@@ -1,12 +1,15 @@
 import { useState, useRef, useCallback } from "react";
 import { useLocation } from "wouter";
-import { Upload as UploadIcon, FileText, Image, X, CheckCircle, AlertCircle } from "lucide-react";
+import { Upload as UploadIcon, FileText, X, CheckCircle, AlertCircle, Globe } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import { extractInvoiceData } from "@/lib/ocr";
+import { SOURCE_COUNTRIES, type SourceCountry } from "@/lib/types";
 import type { ExtractedInvoice } from "@/lib/types";
 import { toast } from "sonner";
 
@@ -21,7 +24,10 @@ export function Upload() {
   const [stepLabel, setStepLabel] = useState("");
   const [progress, setProgress] = useState(0);
   const [error, setError] = useState("");
+  const [sourceCountry, setSourceCountry] = useState<SourceCountry>("US");
   const fileRef = useRef<HTMLInputElement>(null);
+
+  const selectedCountry = SOURCE_COUNTRIES.find((c) => c.code === sourceCountry)!;
 
   const handleFile = (f: File) => {
     const allowed = ["application/pdf", "image/png", "image/jpeg", "image/jpg"];
@@ -79,8 +85,7 @@ export function Upload() {
           setStepLabel(label);
           setProgress(15 + Math.round(pct * 0.7));
         });
-      } catch (ocrErr: any) {
-        // If OCR fails entirely, create placeholder data so the user can edit manually
+      } catch {
         extracted = {
           invoiceNumber: "",
           invoiceDate: "",
@@ -91,10 +96,14 @@ export function Upload() {
           taxAmount: 0,
           taxRate: 0,
           total: 0,
-          currency: "USD",
+          currency: selectedCountry.currency,
         };
         toast.warning("OCR extraction was limited. Please fill in the details manually.");
       }
+
+      // Attach source country + currency from user selection
+      extracted.sourceCountry = sourceCountry;
+      extracted.currency = selectedCountry.currency;
 
       setProgress(88);
       setStep(2);
@@ -104,7 +113,7 @@ export function Upload() {
       const extractRes = await fetch(`/api/invoices/${invoiceId}/extract`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ extractedData: extracted }),
+        body: JSON.stringify({ extractedData: extracted, sourceCountry }),
       });
       if (!extractRes.ok) throw new Error("Failed to save extracted data");
 
@@ -124,11 +133,46 @@ export function Upload() {
     <div className="max-w-2xl mx-auto px-4 py-12">
       <div className="mb-8">
         <h1 className="text-3xl font-bold mb-2">Upload Invoice</h1>
-        <p className="text-muted-foreground">Upload a US invoice PDF or image to convert it to GST format</p>
+        <p className="text-muted-foreground">Upload an invoice PDF or image and convert it to Indian GST format</p>
       </div>
 
       {!processing ? (
         <div className="space-y-6">
+          {/* Source Country Selector */}
+          <Card className="border-primary/20">
+            <CardContent className="p-5">
+              <Label className="text-sm font-semibold mb-3 flex items-center gap-2">
+                <Globe className="w-4 h-4 text-primary" />
+                Invoice Origin Country
+              </Label>
+              <Select value={sourceCountry} onValueChange={(v) => setSourceCountry(v as SourceCountry)}>
+                <SelectTrigger className="mt-2">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {SOURCE_COUNTRIES.map((c) => (
+                    <SelectItem key={c.code} value={c.code}>
+                      <span className="flex items-center gap-2">
+                        <span>{c.flag}</span>
+                        <span>{c.name}</span>
+                        <span className="text-muted-foreground text-xs">({c.currency} · {c.taxSystemName})</span>
+                      </span>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {sourceCountry && (
+                <div className="mt-3 flex items-center gap-3 p-3 rounded-lg bg-muted/50">
+                  <span className="text-2xl">{selectedCountry.flag}</span>
+                  <div className="text-sm">
+                    <p className="font-medium">{selectedCountry.name} → India</p>
+                    <p className="text-muted-foreground">{selectedCountry.taxSystemName} → Indian GST · {selectedCountry.currency}</p>
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
           {/* Dropzone */}
           <div
             className={cn(

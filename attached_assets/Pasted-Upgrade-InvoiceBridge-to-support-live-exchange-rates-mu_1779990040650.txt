@@ -1,0 +1,330 @@
+Upgrade InvoiceBridge to support **live exchange rates + multi-country invoice conversion**.
+
+Current system supports:
+
+* US → India invoice conversion
+
+Expand it into a global invoice conversion platform.
+
+---
+
+# Feature 1: Live Exchange Rates
+
+Replace hardcoded exchange rates with real-time currency lookup.
+
+---
+
+## Create API Route
+
+Create:
+
+`src/app/api/exchange-rate/route.ts`
+
+Purpose:
+
+Fetch real-time currency exchange rates.
+
+Support:
+
+* USD → INR
+* GBP → INR
+* EUR → INR
+* CAD → INR
+* AUD → INR
+
+Response:
+
+```json id="pq6b1n"
+{
+  "from": "USD",
+  "to": "INR",
+  "rate": 83.42,
+  "timestamp": "..."
+}
+```
+
+---
+
+## Create Utility
+
+`src/lib/exchange.ts`
+
+Requirements:
+
+* Fetch live rates
+* Cache results for 1 hour
+* Fallback values if API fails
+
+Fallback:
+
+```typescript id="lk7h8f"
+USD: 83
+GBP: 105
+EUR: 90
+CAD: 61
+AUD: 55
+```
+
+---
+
+## Convert Page Update
+
+Update:
+
+`src/app/convert/[id]/page.tsx`
+
+Add:
+
+* Auto-fetch exchange rate
+* Display live status
+* Manual override field
+
+Show:
+
+"Live exchange rate updated"
+
+---
+
+# Feature 2: Multi-Country Conversion
+
+Expand conversion support.
+
+Current:
+
+US → India
+
+Add:
+
+* US → India
+* UK → India
+* EU → India
+* Canada → India
+* Australia → India
+
+---
+
+## Add Source Country Selector
+
+On upload / convert page:
+
+Dropdown:
+
+* United States
+* United Kingdom
+* European Union
+* Canada
+* Australia
+
+Target country remains:
+
+India
+
+---
+
+## Update Database Schema
+
+Update invoice schema:
+
+```prisma id="jj8y2q"
+sourceCountry String
+sourceCurrency String
+taxSystem String
+```
+
+Add enum:
+
+```prisma id="vkp3nm"
+enum SourceCountry {
+  US
+  UK
+  EU
+  CA
+  AU
+}
+```
+
+Run migration.
+
+---
+
+# Feature 3: Dynamic Tax Conversion Engine
+
+Refactor:
+
+`src/lib/converter.ts`
+
+Create country-specific rule mapping.
+
+---
+
+## Tax Mapping Rules
+
+### United States
+
+Sales Tax → GST
+
+---
+
+### United Kingdom
+
+VAT → GST
+
+---
+
+### European Union
+
+VAT → GST
+
+---
+
+### Canada
+
+GST/HST → Indian GST
+
+---
+
+### Australia
+
+GST → Indian GST
+
+---
+
+## Conversion Output
+
+Convert all into Indian GST format.
+
+Support:
+
+* IGST
+* CGST + SGST
+
+Based on supply type.
+
+---
+
+# Feature 4: Modular Rule Engine
+
+Create:
+
+`src/lib/rules/`
+
+Files:
+
+* us.ts
+* uk.ts
+* eu.ts
+* ca.ts
+* au.ts
+
+Each should export:
+
+```typescript id="dlkq4t"
+convertTax()
+mapInvoiceFields()
+normalizeCurrency()
+```
+
+---
+
+# Feature 5: UI Enhancements
+
+Update convert page.
+
+Add:
+
+### Source Country Card
+
+Shows:
+
+* country
+* tax system
+* source currency
+
+---
+
+### Conversion Summary
+
+Display:
+
+```plaintext id="qq3bb4"
+GBP → INR
+UK VAT → Indian GST
+```
+
+Dynamic based on selected country.
+
+---
+
+# Feature 6: Dashboard Updates
+
+Update dashboard table.
+
+Add columns:
+
+* Source Country
+* Source Currency
+* Conversion Type
+
+Example:
+
+US → India
+UK → India
+
+---
+
+# Feature 7: Landing Page Update
+
+Update homepage messaging.
+
+Change headline to:
+
+Convert Global Invoices into Indian GST-Compliant Tax Invoices
+
+Add feature cards:
+
+* Multi-Country Support
+* Live Exchange Rates
+* Smart Tax Mapping
+
+---
+
+# Performance Requirements
+
+* Exchange lookup < 2 sec
+* Conversion < 10 sec
+* Graceful fallback if exchange API fails
+
+---
+
+# Backward Compatibility
+
+Existing US invoice functionality must continue working.
+
+Do not break:
+
+* Upload
+* OCR
+* PDF generation
+* Auth
+* Dashboard
+* Download
+
+---
+
+# Final Supported Flows
+
+1. US → India
+2. UK → India
+3. EU → India
+4. Canada → India
+5. Australia → India
+
+All with:
+
+* live exchange rates
+* country-aware tax conversion
+* GST PDF generation
+
+---
+
+Implement this as a scalable modular architecture suitable for future country additions.

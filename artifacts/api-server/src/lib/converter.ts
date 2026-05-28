@@ -1,5 +1,6 @@
-// InvoiceBridge — Invoice Conversion Engine (ported from Next.js)
-// Converts extracted US invoice data into Indian GST-compliant format.
+import { getCountryRule, type SourceCountry } from "./rules/index";
+
+export type { SourceCountry };
 
 export interface LineItem {
   sno: number;
@@ -27,6 +28,7 @@ export interface ExtractedInvoice {
   taxRate: number;
   total: number;
   currency: string;
+  sourceCountry?: SourceCountry;
 }
 
 export interface ConversionOptions {
@@ -37,6 +39,7 @@ export interface ConversionOptions {
   buyerGSTIN: string;
   placeOfSupply: string;
   stateCode: string;
+  sourceCountry?: SourceCountry;
 }
 
 export interface ConvertedLineItem {
@@ -78,6 +81,9 @@ export interface ConvertedInvoiceData {
   exchangeRate: number;
   originalCurrency: string;
   originalTotal: number;
+  sourceCountry: SourceCountry;
+  sourceTaxSystem: string;
+  conversionLabel: string;
   amountInWords: string;
 }
 
@@ -98,10 +104,10 @@ function numberToIndianWords(amount: number): string {
 
   function convertLessThanThousand(n: number): string {
     if (n === 0) return "";
-    if (n < 20) return ones[n];
+    if (n < 20) return ones[n]!;
     if (n < 100)
-      return tens[Math.floor(n / 10)] + (n % 10 !== 0 ? " " + ones[n % 10] : "");
-    return ones[Math.floor(n / 100)] + " Hundred" + (n % 100 !== 0 ? " " + convertLessThanThousand(n % 100) : "");
+      return tens[Math.floor(n / 10)]! + (n % 10 !== 0 ? " " + ones[n % 10]! : "");
+    return ones[Math.floor(n / 100)]! + " Hundred" + (n % 100 !== 0 ? " " + convertLessThanThousand(n % 100) : "");
   }
 
   const wholePart = Math.floor(amount);
@@ -144,7 +150,12 @@ export function convertInvoice(extracted: ExtractedInvoice, options: ConversionO
   const isInterState = supplyType === "inter-state";
   const halfGSTRate = gstRate / 2;
 
+  const sourceCountry: SourceCountry = options.sourceCountry ?? extracted.sourceCountry ?? "US";
+  const rule = getCountryRule(sourceCountry);
+
+  // Normalize each line item: strip source tax, convert to INR, apply Indian GST
   const convertedItems: ConvertedLineItem[] = extracted.lineItems.map((item) => {
+    // Use item.amount as-is (already pre-tax per line item)
     const taxableValueINR = round2(item.amount * exchangeRate);
     const rateINR = round2(item.unitPrice * exchangeRate);
 
@@ -194,6 +205,8 @@ export function convertInvoice(extracted: ExtractedInvoice, options: ConversionO
   const roundOffValue = round2(roundOff(grandTotalINR));
   const totalAfterRoundOffINR = Math.round(grandTotalINR);
 
+  const conversionLabel = `${rule.currency} → INR · ${rule.taxSystemName} → Indian GST`;
+
   return {
     invoiceNumber: generateGSTInvoiceNumber(),
     invoiceDate: todayFormatted(),
@@ -223,8 +236,11 @@ export function convertInvoice(extracted: ExtractedInvoice, options: ConversionO
     roundOffINR: roundOffValue,
     totalAfterRoundOffINR,
     exchangeRate,
-    originalCurrency: extracted.currency || "USD",
+    originalCurrency: extracted.currency || rule.currency,
     originalTotal: extracted.total,
+    sourceCountry,
+    sourceTaxSystem: rule.taxSystemName,
+    conversionLabel,
     amountInWords: numberToIndianWords(totalAfterRoundOffINR),
   };
 }

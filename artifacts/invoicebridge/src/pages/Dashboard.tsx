@@ -6,7 +6,9 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { formatINR, formatUSD } from "@/lib/types";
+import { formatINR } from "@/lib/types";
+import { getSourceCountry, SOURCE_COUNTRIES } from "@/lib/types";
+import type { SourceCountry } from "@/lib/types";
 import { format } from "date-fns";
 import { toast } from "sonner";
 import { motion } from "framer-motion";
@@ -19,6 +21,16 @@ const statusColors: Record<string, string> = {
   CONVERTED: "bg-green-100 text-green-700",
   FAILED: "bg-red-100 text-red-700",
 };
+
+function CountryBadge({ code }: { code?: string }) {
+  const country = SOURCE_COUNTRIES.find((c) => c.code === (code ?? "US")) ?? SOURCE_COUNTRIES[0]!;
+  return (
+    <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
+      <span>{country.flag}</span>
+      <span>{country.code}</span>
+    </span>
+  );
+}
 
 export function Dashboard() {
   const queryClient = useQueryClient();
@@ -116,6 +128,7 @@ export function Dashboard() {
                 <thead>
                   <tr className="text-left text-xs text-muted-foreground border-b">
                     <th className="pb-3 pr-4 font-medium">File</th>
+                    <th className="pb-3 pr-4 font-medium">Origin</th>
                     <th className="pb-3 pr-4 font-medium">Date</th>
                     <th className="pb-3 pr-4 font-medium">Original</th>
                     <th className="pb-3 pr-4 font-medium">Converted (INR)</th>
@@ -124,61 +137,80 @@ export function Dashboard() {
                   </tr>
                 </thead>
                 <tbody>
-                  {data.invoices.map((invoice) => (
-                    <tr key={invoice.id} className="border-b last:border-0 hover:bg-muted/30 transition-colors">
-                      <td className="py-3 pr-4">
-                        <div className="flex items-center gap-2">
-                          <FileText className="w-4 h-4 text-muted-foreground shrink-0" />
-                          <span className="font-medium truncate max-w-[150px]" title={invoice.fileName ?? "—"}>
-                            {invoice.fileName ?? "—"}
+                  {data.invoices.map((invoice) => {
+                    const sc = (invoice as any).sourceCountry as SourceCountry | undefined;
+                    const country = getSourceCountry(sc ?? "US");
+                    const convertedData = (invoice as any).converted?.convertedData;
+                    const convLabel = convertedData?.conversionLabel;
+
+                    return (
+                      <tr key={invoice.id} className="border-b last:border-0 hover:bg-muted/30 transition-colors">
+                        <td className="py-3 pr-4">
+                          <div className="flex items-center gap-2">
+                            <FileText className="w-4 h-4 text-muted-foreground shrink-0" />
+                            <span className="font-medium truncate max-w-[140px]" title={invoice.fileName ?? "—"}>
+                              {invoice.fileName ?? "—"}
+                            </span>
+                          </div>
+                        </td>
+                        <td className="py-3 pr-4">
+                          <div className="flex flex-col gap-0.5">
+                            <CountryBadge code={sc} />
+                            {convLabel ? (
+                              <span className="text-xs text-muted-foreground">{convLabel.split("·")[1]?.trim()}</span>
+                            ) : (
+                              <span className="text-xs text-muted-foreground">{country.taxSystemName}</span>
+                            )}
+                          </div>
+                        </td>
+                        <td className="py-3 pr-4 text-muted-foreground whitespace-nowrap">
+                          {format(new Date(invoice.createdAt), "MMM d, yyyy")}
+                        </td>
+                        <td className="py-3 pr-4 whitespace-nowrap">
+                          {invoice.originalAmount > 0
+                            ? `${country.currencySymbol}${new Intl.NumberFormat("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(invoice.originalAmount)}`
+                            : "—"}
+                        </td>
+                        <td className="py-3 pr-4 font-medium whitespace-nowrap">
+                          {(invoice as any).converted?.inrAmount
+                            ? `₹${formatINR((invoice as any).converted.inrAmount)}`
+                            : "—"}
+                        </td>
+                        <td className="py-3 pr-4">
+                          <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${statusColors[invoice.status] ?? "bg-muted text-muted-foreground"}`}>
+                            {invoice.status}
                           </span>
-                        </div>
-                      </td>
-                      <td className="py-3 pr-4 text-muted-foreground whitespace-nowrap">
-                        {format(new Date(invoice.createdAt), "MMM d, yyyy")}
-                      </td>
-                      <td className="py-3 pr-4 whitespace-nowrap">
-                        {invoice.originalAmount > 0 ? formatUSD(invoice.originalAmount) : "—"}
-                      </td>
-                      <td className="py-3 pr-4 font-medium whitespace-nowrap">
-                        {(invoice as any).converted?.inrAmount
-                          ? `₹${formatINR((invoice as any).converted.inrAmount)}`
-                          : "—"}
-                      </td>
-                      <td className="py-3 pr-4">
-                        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${statusColors[invoice.status] ?? "bg-muted text-muted-foreground"}`}>
-                          {invoice.status}
-                        </span>
-                      </td>
-                      <td className="py-3">
-                        <div className="flex items-center gap-1">
-                          {invoice.status === "EXTRACTED" && (
-                            <Link href={`/convert/${invoice.id}`}>
-                              <Button variant="ghost" size="sm" className="h-7 text-xs gap-1 text-primary">
-                                Convert
-                              </Button>
-                            </Link>
-                          )}
-                          {invoice.status === "CONVERTED" && (
-                            <a href={`/api/invoices/${invoice.id}/download`} download>
-                              <Button variant="ghost" size="icon" className="h-7 w-7 text-primary">
-                                <Download className="w-3.5 h-3.5" />
-                              </Button>
-                            </a>
-                          )}
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-7 w-7 text-muted-foreground hover:text-destructive"
-                            onClick={() => handleDelete(invoice.id)}
-                            disabled={deleteMutation.isPending}
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </Button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
+                        </td>
+                        <td className="py-3">
+                          <div className="flex items-center gap-1">
+                            {invoice.status === "EXTRACTED" && (
+                              <Link href={`/convert/${invoice.id}`}>
+                                <Button variant="ghost" size="sm" className="h-7 text-xs gap-1 text-primary">
+                                  Convert
+                                </Button>
+                              </Link>
+                            )}
+                            {invoice.status === "CONVERTED" && (
+                              <a href={`/api/invoices/${invoice.id}/download`} download>
+                                <Button variant="ghost" size="icon" className="h-7 w-7 text-primary">
+                                  <Download className="w-3.5 h-3.5" />
+                                </Button>
+                              </a>
+                            )}
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                              onClick={() => handleDelete(invoice.id)}
+                              disabled={deleteMutation.isPending}
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </Button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>

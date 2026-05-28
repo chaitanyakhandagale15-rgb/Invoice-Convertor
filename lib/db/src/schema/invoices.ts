@@ -20,6 +20,7 @@ export const invoicesTable = pgTable("invoices", {
   status: invoiceStatusEnum("status").notNull().default("UPLOADED"),
   originalAmount: doublePrecision("original_amount").notNull().default(0),
   originalCurrency: text("original_currency").notNull().default("USD"),
+  sourceCountry: text("source_country").notNull().default("US"),
   extractedData: json("extracted_data"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
