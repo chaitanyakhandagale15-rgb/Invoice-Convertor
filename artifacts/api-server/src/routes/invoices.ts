@@ -1,10 +1,11 @@
 import { Router, type Request, type Response } from "express";
 import multer from "multer";
 import { db, invoicesTable, convertedInvoicesTable } from "@workspace/db";
-import { eq, desc, count } from "drizzle-orm";
+import { eq, desc, count, and } from "drizzle-orm";
 import { convertInvoice, type ExtractedInvoice, type ConversionOptions } from "../lib/converter";
 import { generateGSTInvoicePDF } from "../lib/pdf";
 import { saveUploadedFile, saveConvertedPDF, readConvertedPDF } from "../lib/file-storage";
+import { requireAuth } from "../middlewares/requireAuth";
 
 const router = Router();
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
@@ -13,27 +14,35 @@ function paramId(req: Request): string {
   return String(req.params["id"]);
 }
 
+// All routes require authentication
+router.use(requireAuth);
+
 // GET /api/invoices
 router.get("/", async (req: Request, res: Response): Promise<void> => {
   try {
+    const userId = req.userId;
     const page = parseInt(req.query["page"] as string) || 1;
     const limit = parseInt(req.query["limit"] as string) || 10;
-    const status = req.query["status"] as string | undefined;
     const offset = (page - 1) * limit;
 
-    const whereClause = status ? eq(invoicesTable.status, status as any) : undefined;
+    const userFilter = eq(invoicesTable.userId, userId);
 
     const [invoices, totalRows, allConverted, allInvoicesCount] = await Promise.all([
       db.query.invoicesTable.findMany({
-        where: whereClause,
+        where: userFilter,
         orderBy: [desc(invoicesTable.createdAt)],
         limit,
         offset,
         with: { converted: true },
       }),
-      db.select({ count: count() }).from(invoicesTable).where(whereClause),
-      db.select({ inrAmount: convertedInvoicesTable.inrAmount, processedAt: convertedInvoicesTable.processedAt }).from(convertedInvoicesTable),
-      db.select({ count: count() }).from(invoicesTable),
+      db.select({ count: count() }).from(invoicesTable).where(userFilter),
+      db.select({ inrAmount: convertedInvoicesTable.inrAmount, processedAt: convertedInvoicesTable.processedAt })
+        .from(convertedInvoicesTable)
+        .innerJoin(invoicesTable, and(
+          eq(convertedInvoicesTable.invoiceId, invoicesTable.id),
+          eq(invoicesTable.userId, userId),
+        )),
+      db.select({ count: count() }).from(invoicesTable).where(userFilter),
     ]);
 
     const totalCount = totalRows[0]?.count ?? 0;
@@ -61,10 +70,19 @@ router.get("/", async (req: Request, res: Response): Promise<void> => {
 // GET /api/invoices/stats
 router.get("/stats", async (req: Request, res: Response): Promise<void> => {
   try {
+    const userId = req.userId;
+    const userFilter = eq(invoicesTable.userId, userId);
+
     const [allConverted, allInvoicesCount] = await Promise.all([
-      db.select({ inrAmount: convertedInvoicesTable.inrAmount, processedAt: convertedInvoicesTable.processedAt }).from(convertedInvoicesTable),
-      db.select({ count: count() }).from(invoicesTable),
+      db.select({ inrAmount: convertedInvoicesTable.inrAmount, processedAt: convertedInvoicesTable.processedAt })
+        .from(convertedInvoicesTable)
+        .innerJoin(invoicesTable, and(
+          eq(convertedInvoicesTable.invoiceId, invoicesTable.id),
+          eq(invoicesTable.userId, userId),
+        )),
+      db.select({ count: count() }).from(invoicesTable).where(userFilter),
     ]);
+
     const totalInvoices = allInvoicesCount[0]?.count ?? 0;
     const totalConverted = allConverted.length;
     const totalAmountProcessed = allConverted.reduce((s, c) => s + c.inrAmount, 0);
@@ -96,6 +114,7 @@ router.post("/", upload.single("file"), async (req: Request, res: Response): Pro
     }
 
     const [invoice] = await db.insert(invoicesTable).values({
+      userId: req.userId,
       fileName: file.originalname,
       status: "UPLOADED",
     }).returning();
@@ -115,7 +134,7 @@ router.get("/:id", async (req: Request, res: Response): Promise<void> => {
   const id = paramId(req);
   try {
     const invoice = await db.query.invoicesTable.findFirst({
-      where: eq(invoicesTable.id, id),
+      where: and(eq(invoicesTable.id, id), eq(invoicesTable.userId, req.userId)),
       with: { converted: true },
     });
     if (!invoice) {
@@ -133,7 +152,9 @@ router.get("/:id", async (req: Request, res: Response): Promise<void> => {
 router.delete("/:id", async (req: Request, res: Response): Promise<void> => {
   const id = paramId(req);
   try {
-    await db.delete(invoicesTable).where(eq(invoicesTable.id, id));
+    await db.delete(invoicesTable).where(
+      and(eq(invoicesTable.id, id), eq(invoicesTable.userId, req.userId))
+    );
     res.status(204).send();
   } catch (err) {
     req.log.error({ err }, "Delete invoice error");
@@ -157,7 +178,7 @@ router.post("/:id/extract", async (req: Request, res: Response): Promise<void> =
       originalAmount: (extractedData as any).total || 0,
       originalCurrency: (extractedData as any).currency || "USD",
       updatedAt: new Date(),
-    }).where(eq(invoicesTable.id, id)).returning();
+    }).where(and(eq(invoicesTable.id, id), eq(invoicesTable.userId, req.userId))).returning();
 
     if (!updated) {
       res.status(404).json({ error: "Invoice not found" });
@@ -177,6 +198,14 @@ router.post("/:id/convert", async (req: Request, res: Response): Promise<void> =
     const { extractedData, conversionOptions } = req.body as { extractedData: unknown; conversionOptions: unknown };
     if (!extractedData || !conversionOptions) {
       res.status(400).json({ error: "Missing required fields" });
+      return;
+    }
+
+    const ownerCheck = await db.query.invoicesTable.findFirst({
+      where: and(eq(invoicesTable.id, id), eq(invoicesTable.userId, req.userId)),
+    });
+    if (!ownerCheck) {
+      res.status(404).json({ error: "Invoice not found" });
       return;
     }
 
@@ -213,11 +242,11 @@ router.get("/:id/download", async (req: Request, res: Response): Promise<void> =
   const id = paramId(req);
   try {
     const invoice = await db.query.invoicesTable.findFirst({
-      where: eq(invoicesTable.id, id),
+      where: and(eq(invoicesTable.id, id), eq(invoicesTable.userId, req.userId)),
       with: { converted: true },
     });
 
-    const converted = (invoice as any)?.converted as { convertedData: unknown; id: string } | null | undefined;
+    const converted = (invoice as any)?.converted as { convertedData: unknown } | null | undefined;
     if (!invoice || !converted) {
       res.status(404).json({ error: "Converted invoice not found" });
       return;

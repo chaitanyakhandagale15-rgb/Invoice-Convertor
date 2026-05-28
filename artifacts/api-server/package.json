@@ -10,6 +10,8 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
+    "@clerk/express": "^2.1.21",
+    "@clerk/shared": "^4.13.1",
     "@types/multer": "^2.1.0",
     "@types/pdfkit": "^0.17.6",
     "@workspace/api-zod": "workspace:*",
@@ -18,6 +20,7 @@
     "cors": "^2.8.6",
     "drizzle-orm": "catalog:",
     "express": "^5.2.1",
+    "http-proxy-middleware": "^4.0.0",
     "multer": "^2.1.1",
     "pdfkit": "^0.18.0",
     "pino": "^9.14.0",

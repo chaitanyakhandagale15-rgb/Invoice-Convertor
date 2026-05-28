@@ -1,0 +1,269 @@
+Add complete authentication to **InvoiceBridge** using **Clerk with Google Sign-In**.
+
+The app is already fully built using:
+
+* Next.js 14 (App Router)
+* TypeScript
+* Tailwind CSS
+* Existing working backend APIs
+* Database already stores invoices
+
+Goal: add secure Google authentication and make InvoiceBridge a production-ready SaaS.
+
+---
+
+## Authentication Requirements
+
+Use:
+
+**Clerk + Google OAuth**
+
+Implement:
+
+* Sign up with Google
+* Sign in with Google
+* Protected routes
+* User-specific invoice history
+* Session persistence
+* Redirect unauthenticated users
+
+---
+
+## Install Dependencies
+
+Install:
+
+```bash
+npm install @clerk/nextjs
+```
+
+---
+
+## Environment Variables
+
+Add:
+
+```env
+NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=
+CLERK_SECRET_KEY=
+```
+
+---
+
+## Configure Clerk
+
+Create:
+
+### `middleware.ts`
+
+Protect these routes:
+
+* `/dashboard`
+* `/upload`
+* `/convert`
+* `/download`
+
+Unauthenticated users should redirect to:
+
+```plaintext
+/sign-in
+```
+
+---
+
+## Update Root Layout
+
+Update:
+
+### `src/app/layout.tsx`
+
+Wrap app with:
+
+`<ClerkProvider>`
+
+---
+
+## Authentication Pages
+
+Create:
+
+### `src/app/sign-in/[[...sign-in]]/page.tsx`
+
+Google login page using Clerk SignIn component.
+
+---
+
+### `src/app/sign-up/[[...sign-up]]/page.tsx`
+
+Google signup page using Clerk SignUp component.
+
+---
+
+## Navbar Updates
+
+Update:
+
+### `src/components/layout/navbar.tsx`
+
+Requirements:
+
+If logged out:
+
+Show:
+
+* Sign In button
+* Get Started button
+
+If logged in:
+
+Show:
+
+* Dashboard
+* Upload
+* User avatar dropdown
+* Sign Out button
+
+Use Clerk components:
+
+* SignedIn
+* SignedOut
+* UserButton
+
+---
+
+## Database Integration
+
+Connect invoices to authenticated users.
+
+Update upload route:
+
+### `src/app/api/upload/route.ts`
+
+Attach:
+
+```typescript
+userId
+```
+
+from Clerk auth session.
+
+---
+
+## Dashboard Filtering
+
+Update:
+
+### `GET /api/invoices`
+
+Only fetch invoices for current authenticated user.
+
+Each user should only see their own:
+
+* uploads
+* conversions
+* downloads
+* dashboard stats
+
+---
+
+## Landing Page CTA
+
+Update homepage buttons:
+
+If logged out:
+
+"Sign in with Google"
+
+If logged in:
+
+"Go to Dashboard"
+
+---
+
+## Upload Page Protection
+
+If user is not authenticated:
+
+redirect to sign-in
+
+---
+
+## Dashboard Protection
+
+If user is not authenticated:
+
+redirect to sign-in
+
+---
+
+## Styling Requirements
+
+Keep current InvoiceBridge SaaS design.
+
+Google sign-in page should match app branding:
+
+* Blue + white
+* Clean card
+* Centered auth form
+* Professional SaaS feel
+
+---
+
+## Google Authentication Flow
+
+User visits site
+→ Clicks "Sign in with Google"
+→ Google OAuth popup
+→ Authenticated via Clerk
+→ Redirect to Dashboard
+→ Upload invoices
+→ User-specific history saved
+
+---
+
+## Required Deliverables
+
+Generate:
+
+### Authentication files
+
+* middleware.ts
+* sign-in page
+* sign-up page
+
+### Updated files
+
+* layout.tsx
+* navbar.tsx
+* upload API route
+* invoices API route
+* dashboard page
+
+---
+
+## Important
+
+Do NOT break existing backend logic.
+
+Preserve:
+
+* invoice upload
+* extraction
+* conversion
+* PDF generation
+* dashboard
+
+Only layer authentication on top.
+
+---
+
+## Final Result
+
+InvoiceBridge should become a complete authenticated SaaS where users can:
+
+* Sign in with Google
+* Upload invoices
+* Convert invoices
+* Download GST PDFs
+* View personal dashboard history
+* Sign out securely

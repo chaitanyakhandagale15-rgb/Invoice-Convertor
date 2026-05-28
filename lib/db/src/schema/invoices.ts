@@ -14,6 +14,7 @@ export const invoiceStatusEnum = pgEnum("invoice_status", [
 
 export const invoicesTable = pgTable("invoices", {
   id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  userId: text("user_id").notNull().default(""),
   fileName: text("file_name"),
   filePath: text("file_path"),
   status: invoiceStatusEnum("status").notNull().default("UPLOADED"),

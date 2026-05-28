@@ -1,3 +1,4 @@
+@layer theme, base, clerk, components, utilities;
 @import "tailwindcss";
 @import "tw-animate-css";
 
@@ -100,6 +101,17 @@
   body {
     @apply font-sans antialiased bg-background text-foreground;
   }
+}
+
+/* Clerk pseudo-state overrides — outside any @layer so they apply globally */
+.cl-formFieldInput::placeholder {
+  color: #94a3b8;
+  opacity: 1;
+}
+.cl-formFieldInput:focus {
+  outline: none;
+  border-color: hsl(221 83% 53%);
+  box-shadow: 0 0 0 2px hsl(221 83% 53% / 0.2);
 }
 
 @keyframes fadeInUp {
