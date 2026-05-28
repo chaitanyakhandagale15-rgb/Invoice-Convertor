@@ -1,0 +1,62 @@
+// InvoiceBridge — Prisma Schema
+// learn more: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ─── Models ───────────────────────────────────────────────────────────────────
+
+model User {
+  id        String    @id @default(cuid())
+  email     String    @unique
+  name      String?
+  createdAt DateTime  @default(now())
+  invoices  Invoice[]
+}
+
+model Invoice {
+  id               String            @id @default(cuid())
+  userId           String?
+  user             User?             @relation(fields: [userId], references: [id])
+  sourceCountry    String            @default("US")
+  targetCountry    String            @default("IN")
+  originalAmount   Float             @default(0)
+  originalCurrency String            @default("USD")
+  status           InvoiceStatus     @default(UPLOADED)
+  filePath         String?
+  fileName         String?
+  extractedData    Json?
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+  converted        ConvertedInvoice?
+}
+
+model ConvertedInvoice {
+  id            String   @id @default(cuid())
+  invoiceId     String   @unique
+  invoice       Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  inrAmount     Float
+  cgstAmount    Float    @default(0)
+  sgstAmount    Float    @default(0)
+  igstAmount    Float    @default(0)
+  gstRate       Float    @default(18)
+  exchangeRate  Float    @default(83)
+  convertedData Json
+  pdfPath       String?
+  processedAt   DateTime @default(now())
+}
+
+enum InvoiceStatus {
+  UPLOADED
+  EXTRACTING
+  EXTRACTED
+  CONVERTING
+  CONVERTED
+  FAILED
+}
