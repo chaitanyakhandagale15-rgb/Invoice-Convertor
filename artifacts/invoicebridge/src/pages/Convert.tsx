@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useParams, useLocation } from "wouter";
 import { useGetInvoice, useConvertInvoice } from "@workspace/api-client-react";
+import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -9,6 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
+import { Skeleton } from "@/components/ui/skeleton";
 import { FileDown, Plus, Trash2, Loader2, AlertCircle, RefreshCw, Wifi, WifiOff, Globe } from "lucide-react";
 import {
   INDIAN_STATES, GST_RATES, DEFAULT_CONVERSION_OPTIONS,
@@ -18,6 +20,8 @@ import {
 } from "@/lib/types";
 import type { ExtractedInvoice, ConversionOptions, LineItem } from "@/lib/types";
 import { toast } from "sonner";
+import { ConversionAnimation } from "@/components/ConversionAnimation";
+import { AnimatedNumber } from "@/components/AnimatedNumber";
 
 const BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
 
@@ -37,6 +41,11 @@ async function fetchExchangeRate(currency: string): Promise<LiveRate | null> {
   }
 }
 
+const fadeUp = {
+  hidden: { opacity: 0, y: 16 },
+  visible: (i: number) => ({ opacity: 1, y: 0, transition: { delay: i * 0.07, duration: 0.4 } }),
+};
+
 export function Convert() {
   const { id } = useParams<{ id: string }>();
   const [, navigate] = useLocation();
@@ -49,6 +58,7 @@ export function Convert() {
   const [liveRate, setLiveRate] = useState<LiveRate | null>(null);
   const [rateLoading, setRateLoading] = useState(false);
   const [rateOverride, setRateOverride] = useState(false);
+  const [convertError, setConvertError] = useState<string | null>(null);
 
   const sourceCountry: SourceCountry = extracted?.sourceCountry ?? options.sourceCountry ?? "US";
   const countryInfo = getSourceCountry(sourceCountry);
@@ -76,7 +86,6 @@ export function Convert() {
     }
   }, [invoice, loadLiveRate]);
 
-  // Reload live rate when source country changes
   useEffect(() => {
     loadLiveRate(countryInfo.currency);
   }, [sourceCountry, loadLiveRate, countryInfo.currency]);
@@ -129,6 +138,7 @@ export function Convert() {
 
   const handleConvert = async () => {
     if (!extracted) return;
+    setConvertError(null);
     try {
       await convertMutation.mutateAsync({
         id,
@@ -137,16 +147,36 @@ export function Convert() {
           conversionOptions: { ...options, sourceCountry } as any,
         },
       });
-      toast.success("Invoice converted successfully!");
-      navigate(`/download/${id}`);
+      // Animation stays open; navigate happens after animation exit
+      setTimeout(() => navigate(`/download/${id}`), 500);
     } catch (err: any) {
-      toast.error(err?.message || "Conversion failed. Please try again.");
+      setConvertError(err?.message || "Conversion failed. Please try again.");
+      toast.error(err?.message || "Conversion failed.");
     }
   };
 
   if (isLoading) return (
-    <div className="flex items-center justify-center min-h-[60vh]">
-      <Loader2 className="w-8 h-8 animate-spin text-primary" />
+    <div className="max-w-7xl mx-auto px-4 py-8">
+      <div className="mb-8">
+        <Skeleton className="h-9 w-48 mb-2" />
+        <Skeleton className="h-5 w-72" />
+      </div>
+      <div className="grid lg:grid-cols-5 gap-6">
+        <div className="lg:col-span-3 space-y-4">
+          <Skeleton className="h-28 w-full rounded-xl" />
+          <Skeleton className="h-36 w-full rounded-xl" />
+          <div className="grid md:grid-cols-2 gap-4">
+            <Skeleton className="h-48 rounded-xl" />
+            <Skeleton className="h-48 rounded-xl" />
+          </div>
+          <Skeleton className="h-56 w-full rounded-xl" />
+        </div>
+        <div className="lg:col-span-2 space-y-4">
+          <Skeleton className="h-80 w-full rounded-xl" />
+          <Skeleton className="h-52 w-full rounded-xl" />
+          <Skeleton className="h-12 w-full rounded-xl" />
+        </div>
+      </div>
     </div>
   );
 
@@ -165,332 +195,321 @@ export function Convert() {
   );
 
   return (
-    <div className="max-w-7xl mx-auto px-4 py-8">
-      <div className="mb-8 flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold mb-1">Convert Invoice</h1>
-          <p className="text-muted-foreground">Review extracted data and configure GST settings</p>
-        </div>
-        <Badge variant={invoice.status === "EXTRACTED" ? "default" : "secondary"}>{invoice.status}</Badge>
-      </div>
+    <>
+      <ConversionAnimation
+        open={convertMutation.isPending}
+        sourceCountry={sourceCountry}
+        error={convertError}
+      />
 
-      <div className="grid lg:grid-cols-5 gap-6">
-        {/* Left: Extracted data */}
-        <div className="lg:col-span-3 space-y-4">
-          {/* Source Country Card */}
-          <Card className="border-blue-200 bg-blue-50/50">
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <Globe className="w-5 h-5 text-blue-600" />
-                  <div>
-                    <p className="text-xs text-muted-foreground font-medium">Conversion Route</p>
-                    <p className="font-semibold text-sm">
-                      {countryInfo.flag} {countryInfo.name} → 🇮🇳 India
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      {countryInfo.taxSystemName} ({countryInfo.currency}) → Indian GST
-                    </p>
+      <div className="max-w-7xl mx-auto px-4 py-8">
+        <motion.div custom={0} variants={fadeUp} initial="hidden" animate="visible" className="mb-8 flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold mb-1">Convert Invoice</h1>
+            <p className="text-muted-foreground">Review extracted data and configure GST settings</p>
+          </div>
+          <Badge variant={invoice.status === "EXTRACTED" ? "default" : "secondary"}>{invoice.status}</Badge>
+        </motion.div>
+
+        <div className="grid lg:grid-cols-5 gap-6">
+          {/* Left: Extracted data */}
+          <div className="lg:col-span-3 space-y-4">
+            {/* Source Country Card */}
+            <motion.div custom={1} variants={fadeUp} initial="hidden" animate="visible">
+              <Card className="border-blue-200 bg-blue-50/50">
+                <CardContent className="p-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <Globe className="w-5 h-5 text-blue-600" />
+                      <div>
+                        <p className="text-xs text-muted-foreground font-medium">Conversion Route</p>
+                        <p className="font-semibold text-sm">
+                          {countryInfo.flag} {countryInfo.name} → 🇮🇳 India
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          {countryInfo.taxSystemName} ({countryInfo.currency}) → Indian GST
+                        </p>
+                      </div>
+                    </div>
+                    <Select value={sourceCountry} onValueChange={(v) => handleSourceCountryChange(v as SourceCountry)}>
+                      <SelectTrigger className="w-44 bg-white">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {SOURCE_COUNTRIES.map((c) => (
+                          <SelectItem key={c.code} value={c.code}>
+                            <span className="flex items-center gap-2">
+                              <span>{c.flag}</span>
+                              <span className="font-medium">{c.name}</span>
+                            </span>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
-                </div>
-                <Select value={sourceCountry} onValueChange={(v) => handleSourceCountryChange(v as SourceCountry)}>
-                  <SelectTrigger className="w-44 bg-white">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {SOURCE_COUNTRIES.map((c) => (
-                      <SelectItem key={c.code} value={c.code}>
-                        <span className="flex items-center gap-2">
-                          <span>{c.flag}</span>
-                          <span className="font-medium">{c.name}</span>
-                        </span>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </CardContent>
-          </Card>
+                </CardContent>
+              </Card>
+            </motion.div>
 
-          {/* Invoice info */}
-          <Card>
-            <CardHeader><CardTitle className="text-base">Invoice Information</CardTitle></CardHeader>
-            <CardContent className="grid grid-cols-2 gap-4">
-              <div>
-                <Label className="text-xs text-muted-foreground mb-1 block">Invoice Number</Label>
-                <Input
-                  value={extracted.invoiceNumber}
-                  onChange={(e) => setExtracted({ ...extracted, invoiceNumber: e.target.value })}
-                  placeholder="e.g. INV-001"
-                />
-              </div>
-              <div>
-                <Label className="text-xs text-muted-foreground mb-1 block">Invoice Date</Label>
-                <Input
-                  value={extracted.invoiceDate}
-                  onChange={(e) => setExtracted({ ...extracted, invoiceDate: e.target.value })}
-                  placeholder="e.g. 12/31/2024"
-                />
-              </div>
-            </CardContent>
-          </Card>
+            {/* Invoice info */}
+            <motion.div custom={2} variants={fadeUp} initial="hidden" animate="visible">
+              <Card>
+                <CardHeader><CardTitle className="text-base">Invoice Information</CardTitle></CardHeader>
+                <CardContent className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label className="text-xs text-muted-foreground mb-1 block">Invoice Number</Label>
+                    <Input value={extracted.invoiceNumber} onChange={(e) => setExtracted({ ...extracted, invoiceNumber: e.target.value })} placeholder="e.g. INV-001" />
+                  </div>
+                  <div>
+                    <Label className="text-xs text-muted-foreground mb-1 block">Invoice Date</Label>
+                    <Input value={extracted.invoiceDate} onChange={(e) => setExtracted({ ...extracted, invoiceDate: e.target.value })} placeholder="e.g. 12/31/2024" />
+                  </div>
+                </CardContent>
+              </Card>
+            </motion.div>
 
-          {/* Seller & Buyer */}
-          <div className="grid md:grid-cols-2 gap-4">
-            <Card>
-              <CardHeader><CardTitle className="text-base">Seller Details</CardTitle></CardHeader>
-              <CardContent className="space-y-3">
-                <div>
-                  <Label className="text-xs text-muted-foreground mb-1 block">Company Name</Label>
-                  <Input value={extracted.seller.name} onChange={(e) => setExtracted({ ...extracted, seller: { ...extracted.seller, name: e.target.value } })} placeholder="Seller name" />
-                </div>
-                <div>
-                  <Label className="text-xs text-muted-foreground mb-1 block">Address</Label>
-                  <Textarea value={extracted.seller.address} onChange={(e) => setExtracted({ ...extracted, seller: { ...extracted.seller, address: e.target.value } })} placeholder="Seller address" rows={3} />
-                </div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader><CardTitle className="text-base">Buyer Details</CardTitle></CardHeader>
-              <CardContent className="space-y-3">
-                <div>
-                  <Label className="text-xs text-muted-foreground mb-1 block">Company Name</Label>
-                  <Input value={extracted.buyer.name} onChange={(e) => setExtracted({ ...extracted, buyer: { ...extracted.buyer, name: e.target.value } })} placeholder="Buyer name" />
-                </div>
-                <div>
-                  <Label className="text-xs text-muted-foreground mb-1 block">Address</Label>
-                  <Textarea value={extracted.buyer.address} onChange={(e) => setExtracted({ ...extracted, buyer: { ...extracted.buyer, address: e.target.value } })} placeholder="Buyer address" rows={3} />
-                </div>
-              </CardContent>
-            </Card>
+            {/* Seller & Buyer */}
+            <motion.div custom={3} variants={fadeUp} initial="hidden" animate="visible" className="grid md:grid-cols-2 gap-4">
+              <Card>
+                <CardHeader><CardTitle className="text-base">Seller Details</CardTitle></CardHeader>
+                <CardContent className="space-y-3">
+                  <div>
+                    <Label className="text-xs text-muted-foreground mb-1 block">Company Name</Label>
+                    <Input value={extracted.seller.name} onChange={(e) => setExtracted({ ...extracted, seller: { ...extracted.seller, name: e.target.value } })} placeholder="Seller name" />
+                  </div>
+                  <div>
+                    <Label className="text-xs text-muted-foreground mb-1 block">Address</Label>
+                    <Textarea value={extracted.seller.address} onChange={(e) => setExtracted({ ...extracted, seller: { ...extracted.seller, address: e.target.value } })} placeholder="Seller address" rows={3} />
+                  </div>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader><CardTitle className="text-base">Buyer Details</CardTitle></CardHeader>
+                <CardContent className="space-y-3">
+                  <div>
+                    <Label className="text-xs text-muted-foreground mb-1 block">Company Name</Label>
+                    <Input value={extracted.buyer.name} onChange={(e) => setExtracted({ ...extracted, buyer: { ...extracted.buyer, name: e.target.value } })} placeholder="Buyer name" />
+                  </div>
+                  <div>
+                    <Label className="text-xs text-muted-foreground mb-1 block">Address</Label>
+                    <Textarea value={extracted.buyer.address} onChange={(e) => setExtracted({ ...extracted, buyer: { ...extracted.buyer, address: e.target.value } })} placeholder="Buyer address" rows={3} />
+                  </div>
+                </CardContent>
+              </Card>
+            </motion.div>
+
+            {/* Line items */}
+            <motion.div custom={4} variants={fadeUp} initial="hidden" animate="visible">
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between">
+                  <CardTitle className="text-base">Line Items ({countryInfo.currencySymbol})</CardTitle>
+                  <Button variant="outline" size="sm" onClick={addLineItem} className="gap-1">
+                    <Plus className="w-3 h-3" /> Add Row
+                  </Button>
+                </CardHeader>
+                <CardContent>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="text-left text-xs text-muted-foreground border-b">
+                          <th className="pb-2 pr-3 w-8">#</th>
+                          <th className="pb-2 pr-3">Description</th>
+                          <th className="pb-2 pr-3 w-20">HSN</th>
+                          <th className="pb-2 pr-3 w-16">Qty</th>
+                          <th className="pb-2 pr-3 w-28">Unit ({countryInfo.currencySymbol})</th>
+                          <th className="pb-2 pr-3 w-28">Amount ({countryInfo.currencySymbol})</th>
+                          <th className="pb-2 w-8"></th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {extracted.lineItems.map((item, i) => (
+                          <tr key={i} className="border-b last:border-0">
+                            <td className="py-2 pr-3 text-muted-foreground">{item.sno}</td>
+                            <td className="py-2 pr-3">
+                              <Input value={item.description} onChange={(e) => updateLineItem(i, "description", e.target.value)} className="h-8 text-sm" />
+                            </td>
+                            <td className="py-2 pr-3">
+                              <Input value={item.hsnCode} onChange={(e) => updateLineItem(i, "hsnCode", e.target.value)} className="h-8 text-sm w-20" />
+                            </td>
+                            <td className="py-2 pr-3">
+                              <Input type="number" value={item.quantity} onChange={(e) => updateLineItem(i, "quantity", parseFloat(e.target.value) || 0)} className="h-8 text-sm w-16" />
+                            </td>
+                            <td className="py-2 pr-3">
+                              <Input type="number" value={item.unitPrice} onChange={(e) => updateLineItem(i, "unitPrice", parseFloat(e.target.value) || 0)} className="h-8 text-sm w-24" />
+                            </td>
+                            <td className="py-2 pr-3 text-right font-medium">
+                              {formatCurrency(item.amount, countryInfo.currencySymbol)}
+                            </td>
+                            <td className="py-2">
+                              <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-destructive" onClick={() => removeLineItem(i)}>
+                                <Trash2 className="w-4 h-4" />
+                              </Button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                  <div className="text-right pt-4 font-semibold">
+                    Subtotal: {formatCurrency(subtotal, countryInfo.currencySymbol)}
+                  </div>
+                </CardContent>
+              </Card>
+            </motion.div>
           </div>
 
-          {/* Line items */}
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
-              <CardTitle className="text-base">Line Items ({countryInfo.currencySymbol})</CardTitle>
-              <Button variant="outline" size="sm" onClick={addLineItem} className="gap-1">
-                <Plus className="w-3 h-3" /> Add Row
-              </Button>
-            </CardHeader>
-            <CardContent>
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="text-left text-xs text-muted-foreground border-b">
-                      <th className="pb-2 pr-3 w-8">#</th>
-                      <th className="pb-2 pr-3">Description</th>
-                      <th className="pb-2 pr-3 w-20">HSN</th>
-                      <th className="pb-2 pr-3 w-16">Qty</th>
-                      <th className="pb-2 pr-3 w-28">Unit ({countryInfo.currencySymbol})</th>
-                      <th className="pb-2 pr-3 w-28">Amount ({countryInfo.currencySymbol})</th>
-                      <th className="pb-2 w-8"></th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {extracted.lineItems.map((item, i) => (
-                      <tr key={i} className="border-b last:border-0">
-                        <td className="py-2 pr-3 text-muted-foreground">{item.sno}</td>
-                        <td className="py-2 pr-3">
-                          <Input value={item.description} onChange={(e) => updateLineItem(i, "description", e.target.value)} className="h-8 text-sm" />
-                        </td>
-                        <td className="py-2 pr-3">
-                          <Input value={item.hsnCode} onChange={(e) => updateLineItem(i, "hsnCode", e.target.value)} className="h-8 text-sm w-20" />
-                        </td>
-                        <td className="py-2 pr-3">
-                          <Input type="number" value={item.quantity} onChange={(e) => updateLineItem(i, "quantity", parseFloat(e.target.value) || 0)} className="h-8 text-sm w-16" />
-                        </td>
-                        <td className="py-2 pr-3">
-                          <Input type="number" value={item.unitPrice} onChange={(e) => updateLineItem(i, "unitPrice", parseFloat(e.target.value) || 0)} className="h-8 text-sm w-24" />
-                        </td>
-                        <td className="py-2 pr-3 text-right font-medium">
-                          {formatCurrency(item.amount, countryInfo.currencySymbol)}
-                        </td>
-                        <td className="py-2">
-                          <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-destructive" onClick={() => removeLineItem(i)}>
-                            <Trash2 className="w-4 h-4" />
-                          </Button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-              <div className="text-right pt-4 font-semibold">
-                Subtotal: {formatCurrency(subtotal, countryInfo.currencySymbol)}
-              </div>
-            </CardContent>
-          </Card>
-        </div>
+          {/* Right: Conversion settings + summary */}
+          <div className="lg:col-span-2 space-y-4">
+            <motion.div custom={2} variants={fadeUp} initial="hidden" animate="visible">
+              <Card>
+                <CardHeader><CardTitle className="text-base">Conversion Settings</CardTitle></CardHeader>
+                <CardContent className="space-y-4">
+                  {/* Live Exchange Rate */}
+                  <div>
+                    <div className="flex items-center justify-between mb-1">
+                      <Label className="text-xs text-muted-foreground">
+                        Exchange Rate (1 {countryInfo.currency} = ? INR)
+                      </Label>
+                      <button
+                        type="button"
+                        onClick={() => { setRateOverride(false); loadLiveRate(countryInfo.currency); }}
+                        className="flex items-center gap-1 text-xs text-primary hover:underline"
+                        disabled={rateLoading}
+                      >
+                        <RefreshCw className={`w-3 h-3 ${rateLoading ? "animate-spin" : ""}`} />
+                        Refresh
+                      </button>
+                    </div>
+                    <Input
+                      type="number"
+                      value={options.exchangeRate}
+                      onChange={(e) => {
+                        setRateOverride(true);
+                        setOptions({ ...options, exchangeRate: parseFloat(e.target.value) || countryInfo.fallbackRate });
+                      }}
+                    />
+                    <div className="flex items-center gap-1.5 mt-1.5">
+                      {rateLoading ? (
+                        <span className="text-xs text-muted-foreground flex items-center gap-1">
+                          <Loader2 className="w-3 h-3 animate-spin" /> Fetching live rate...
+                        </span>
+                      ) : liveRate ? (
+                        <>
+                          {liveRate.live ? (
+                            <Wifi className="w-3 h-3 text-green-500" />
+                          ) : (
+                            <WifiOff className="w-3 h-3 text-orange-400" />
+                          )}
+                          <span className={`text-xs ${liveRate.live ? "text-green-600" : "text-orange-500"}`}>
+                            {liveRate.live ? "Live rate" : "Fallback rate"}: 1 {countryInfo.currency} = ₹{liveRate.rate.toFixed(2)}
+                            {rateOverride && " (overridden)"}
+                          </span>
+                        </>
+                      ) : null}
+                    </div>
+                  </div>
 
-        {/* Right: Conversion settings + summary */}
-        <div className="lg:col-span-2 space-y-4">
-          <Card>
-            <CardHeader><CardTitle className="text-base">Conversion Settings</CardTitle></CardHeader>
-            <CardContent className="space-y-4">
-              {/* Live Exchange Rate */}
-              <div>
-                <div className="flex items-center justify-between mb-1">
-                  <Label className="text-xs text-muted-foreground">
-                    Exchange Rate (1 {countryInfo.currency} = ? INR)
-                  </Label>
-                  <button
-                    type="button"
-                    onClick={() => { setRateOverride(false); loadLiveRate(countryInfo.currency); }}
-                    className="flex items-center gap-1 text-xs text-primary hover:underline"
-                    disabled={rateLoading}
-                  >
-                    <RefreshCw className={`w-3 h-3 ${rateLoading ? "animate-spin" : ""}`} />
-                    Refresh
-                  </button>
-                </div>
-                <Input
-                  type="number"
-                  value={options.exchangeRate}
-                  onChange={(e) => {
-                    setRateOverride(true);
-                    setOptions({ ...options, exchangeRate: parseFloat(e.target.value) || countryInfo.fallbackRate });
-                  }}
-                />
-                <div className="flex items-center gap-1.5 mt-1.5">
-                  {rateLoading ? (
-                    <span className="text-xs text-muted-foreground flex items-center gap-1">
-                      <Loader2 className="w-3 h-3 animate-spin" /> Fetching live rate...
-                    </span>
-                  ) : liveRate ? (
+                  <div>
+                    <Label className="text-xs text-muted-foreground mb-1 block">GST Rate (%)</Label>
+                    <Select value={String(options.gstRate)} onValueChange={(v) => setOptions({ ...options, gstRate: parseFloat(v) })}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        {GST_RATES.map((r) => (<SelectItem key={r} value={String(r)}>{r}%</SelectItem>))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label className="text-xs text-muted-foreground mb-1 block">Supply Type</Label>
+                    <Select value={options.supplyType} onValueChange={(v) => setOptions({ ...options, supplyType: v as any })}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="inter-state">Inter-State (IGST)</SelectItem>
+                        <SelectItem value="intra-state">Intra-State (CGST + SGST)</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label className="text-xs text-muted-foreground mb-1 block">Place of Supply</Label>
+                    <Select value={options.placeOfSupply} onValueChange={handleStateChange}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        {INDIAN_STATES.map((s) => (<SelectItem key={s.code} value={s.name}>{s.name} ({s.code})</SelectItem>))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label className="text-xs text-muted-foreground mb-1 block">Seller GSTIN</Label>
+                    <Input value={options.sellerGSTIN} onChange={(e) => setOptions({ ...options, sellerGSTIN: e.target.value.toUpperCase() })} placeholder="27AAAAA0000A1Z5" maxLength={15} />
+                  </div>
+                  <div>
+                    <Label className="text-xs text-muted-foreground mb-1 block">Buyer GSTIN (optional)</Label>
+                    <Input value={options.buyerGSTIN} onChange={(e) => setOptions({ ...options, buyerGSTIN: e.target.value.toUpperCase() })} placeholder="Leave blank if not registered" maxLength={15} />
+                  </div>
+                </CardContent>
+              </Card>
+            </motion.div>
+
+            {/* Live summary */}
+            <motion.div custom={3} variants={fadeUp} initial="hidden" animate="visible">
+              <Card className="border-primary/20 bg-primary/5">
+                <CardHeader>
+                  <CardTitle className="text-base">Conversion Summary</CardTitle>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {countryInfo.flag} {countryInfo.currency} → 🇮🇳 INR · {countryInfo.taxSystemName} → Indian GST
+                  </p>
+                </CardHeader>
+                <CardContent className="space-y-3 text-sm">
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Original Amount</span>
+                    <span className="font-medium">{formatCurrency(subtotal, countryInfo.currencySymbol)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Converted Subtotal</span>
+                    <AnimatedNumber value={subtotalINR} format={(n) => `₹${formatINR(n)}`} className="font-medium" />
+                  </div>
+                  <Separator />
+                  {isInterState ? (
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">IGST @{options.gstRate}%</span>
+                      <AnimatedNumber value={igstAmount} format={(n) => `₹${formatINR(n)}`} className="font-medium" />
+                    </div>
+                  ) : (
                     <>
-                      {liveRate.live ? (
-                        <Wifi className="w-3 h-3 text-green-500" />
-                      ) : (
-                        <WifiOff className="w-3 h-3 text-orange-400" />
-                      )}
-                      <span className={`text-xs ${liveRate.live ? "text-green-600" : "text-orange-500"}`}>
-                        {liveRate.live ? "Live rate" : "Fallback rate"}: 1 {countryInfo.currency} = ₹{liveRate.rate.toFixed(2)}
-                        {rateOverride && " (overridden)"}
-                      </span>
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">CGST @{options.gstRate / 2}%</span>
+                        <AnimatedNumber value={cgstAmount} format={(n) => `₹${formatINR(n)}`} className="font-medium" />
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">SGST @{options.gstRate / 2}%</span>
+                        <AnimatedNumber value={sgstAmount} format={(n) => `₹${formatINR(n)}`} className="font-medium" />
+                      </div>
                     </>
-                  ) : null}
-                </div>
-              </div>
-
-              <div>
-                <Label className="text-xs text-muted-foreground mb-1 block">GST Rate (%)</Label>
-                <Select
-                  value={String(options.gstRate)}
-                  onValueChange={(v) => setOptions({ ...options, gstRate: parseFloat(v) })}
-                >
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    {GST_RATES.map((r) => (
-                      <SelectItem key={r} value={String(r)}>{r}%</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label className="text-xs text-muted-foreground mb-1 block">Supply Type</Label>
-                <Select
-                  value={options.supplyType}
-                  onValueChange={(v) => setOptions({ ...options, supplyType: v as any })}
-                >
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="inter-state">Inter-State (IGST)</SelectItem>
-                    <SelectItem value="intra-state">Intra-State (CGST + SGST)</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label className="text-xs text-muted-foreground mb-1 block">Place of Supply</Label>
-                <Select value={options.placeOfSupply} onValueChange={handleStateChange}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    {INDIAN_STATES.map((s) => (
-                      <SelectItem key={s.code} value={s.name}>{s.name} ({s.code})</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label className="text-xs text-muted-foreground mb-1 block">Seller GSTIN</Label>
-                <Input
-                  value={options.sellerGSTIN}
-                  onChange={(e) => setOptions({ ...options, sellerGSTIN: e.target.value.toUpperCase() })}
-                  placeholder="27AAAAA0000A1Z5"
-                  maxLength={15}
-                />
-              </div>
-              <div>
-                <Label className="text-xs text-muted-foreground mb-1 block">Buyer GSTIN (optional)</Label>
-                <Input
-                  value={options.buyerGSTIN}
-                  onChange={(e) => setOptions({ ...options, buyerGSTIN: e.target.value.toUpperCase() })}
-                  placeholder="Leave blank if not registered"
-                  maxLength={15}
-                />
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Live summary */}
-          <Card className="border-primary/20 bg-primary/5">
-            <CardHeader>
-              <CardTitle className="text-base">Conversion Summary</CardTitle>
-              <p className="text-xs text-muted-foreground mt-1">
-                {countryInfo.flag} {countryInfo.currency} → 🇮🇳 INR · {countryInfo.taxSystemName} → Indian GST
-              </p>
-            </CardHeader>
-            <CardContent className="space-y-3 text-sm">
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Original Amount</span>
-                <span className="font-medium">{formatCurrency(subtotal, countryInfo.currencySymbol)}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Converted Subtotal</span>
-                <span className="font-medium">₹{formatINR(subtotalINR)}</span>
-              </div>
-              <Separator />
-              {isInterState ? (
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">IGST @{options.gstRate}%</span>
-                  <span className="font-medium">₹{formatINR(igstAmount)}</span>
-                </div>
-              ) : (
-                <>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">CGST @{options.gstRate / 2}%</span>
-                    <span className="font-medium">₹{formatINR(cgstAmount)}</span>
+                  )}
+                  <Separator />
+                  <div className="flex justify-between text-base font-bold text-primary">
+                    <span>Grand Total</span>
+                    <AnimatedNumber value={grandTotal} format={(n) => `₹${formatINR(n)}`} className="text-primary" />
                   </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">SGST @{options.gstRate / 2}%</span>
-                    <span className="font-medium">₹{formatINR(sgstAmount)}</span>
+                  <div className="text-xs text-muted-foreground">
+                    Rate: 1 {countryInfo.currency} = ₹{options.exchangeRate.toFixed(2)}
                   </div>
-                </>
-              )}
-              <Separator />
-              <div className="flex justify-between text-base font-bold text-primary">
-                <span>Grand Total</span>
-                <span>₹{formatINR(grandTotal)}</span>
-              </div>
-              <div className="text-xs text-muted-foreground">
-                Rate: 1 {countryInfo.currency} = ₹{options.exchangeRate.toFixed(2)}
-              </div>
-            </CardContent>
-          </Card>
+                </CardContent>
+              </Card>
+            </motion.div>
 
-          <Button
-            onClick={handleConvert}
-            disabled={convertMutation.isPending || extracted.lineItems.length === 0}
-            className="w-full h-12 text-base font-semibold gap-2"
-          >
-            {convertMutation.isPending ? (
-              <><Loader2 className="w-5 h-5 animate-spin" /> Generating PDF...</>
-            ) : (
-              <><FileDown className="w-5 h-5" /> Generate GST Invoice PDF</>
-            )}
-          </Button>
+            <motion.div custom={4} variants={fadeUp} initial="hidden" animate="visible">
+              <Button
+                onClick={handleConvert}
+                disabled={convertMutation.isPending || extracted.lineItems.length === 0}
+                className="w-full h-12 text-base font-semibold gap-2"
+              >
+                <FileDown className="w-5 h-5" />
+                Generate GST Invoice PDF
+              </Button>
+            </motion.div>
+          </div>
         </div>
       </div>
-    </div>
+    </>
   );
 }

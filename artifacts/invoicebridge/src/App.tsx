@@ -1,5 +1,6 @@
 import { useEffect, useRef, type ComponentType } from "react";
 import { Switch, Route, Redirect, useLocation, Router as WouterRouter } from "wouter";
+import { AnimatePresence, motion } from "framer-motion";
 import { ClerkProvider, SignIn, SignUp, Show, useClerk, useUser } from "@clerk/react";
 import { publishableKeyFromHost } from "@clerk/react/internal";
 import { shadcn } from "@clerk/themes";
@@ -88,6 +89,29 @@ const clerkAppearance = {
   },
 };
 
+const pageVariants = {
+  initial: { opacity: 0, y: 12 },
+  animate: { opacity: 1, y: 0 },
+  exit: { opacity: 0, y: -8 },
+};
+
+const pageTransition = { duration: 0.22, ease: "easeOut" };
+
+function PageWrapper({ children }: { children: React.ReactNode }) {
+  return (
+    <motion.div
+      variants={pageVariants}
+      initial="initial"
+      animate="animate"
+      exit="exit"
+      transition={pageTransition}
+      className="flex-1"
+    >
+      {children}
+    </motion.div>
+  );
+}
+
 function SignInPage() {
   return (
     <div className="flex min-h-[100dvh] items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 px-4">
@@ -104,7 +128,6 @@ function SignUpPage() {
   );
 }
 
-// Invalidate query cache when the signed-in user changes
 function ClerkQueryClientCacheInvalidator() {
   const { addListener } = useClerk();
   const qc = useQueryClient();
@@ -124,7 +147,6 @@ function ClerkQueryClientCacheInvalidator() {
   return null;
 }
 
-// Protected route wrapper — redirects to sign-in if not authenticated
 function ProtectedRoute({ component: Component }: { component: ComponentType }) {
   return (
     <>
@@ -138,7 +160,6 @@ function ProtectedRoute({ component: Component }: { component: ComponentType }) 
   );
 }
 
-// Home redirect — signed in → dashboard, signed out → landing
 function HomeRoute() {
   return (
     <>
@@ -153,35 +174,41 @@ function HomeRoute() {
 }
 
 function AppRouter() {
+  const [location] = useLocation();
+
   return (
     <div className="min-h-screen flex flex-col">
       <Navbar />
-      <main className="flex-1">
-        <Switch>
-          <Route path="/" component={HomeRoute} />
-          <Route path="/sign-in/*?" component={SignInPage} />
-          <Route path="/sign-up/*?" component={SignUpPage} />
+      <AnimatePresence mode="wait">
+        <Switch key={location}>
+          <Route path="/">
+            <PageWrapper><HomeRoute /></PageWrapper>
+          </Route>
+          <Route path="/sign-in/*?">
+            <PageWrapper><SignInPage /></PageWrapper>
+          </Route>
+          <Route path="/sign-up/*?">
+            <PageWrapper><SignUpPage /></PageWrapper>
+          </Route>
           <Route path="/upload">
-            <ProtectedRoute component={Upload} />
+            <PageWrapper><ProtectedRoute component={Upload} /></PageWrapper>
           </Route>
           <Route path="/convert/:id">
-            {(params) => (
-              <ProtectedRoute component={() => <Convert />} />
-            )}
+            <PageWrapper><ProtectedRoute component={Convert} /></PageWrapper>
           </Route>
           <Route path="/download/:id">
-            {(params) => (
-              <ProtectedRoute component={() => <DownloadPage />} />
-            )}
+            <PageWrapper><ProtectedRoute component={DownloadPage} /></PageWrapper>
           </Route>
           <Route path="/dashboard">
-            <ProtectedRoute component={Dashboard} />
+            <PageWrapper><ProtectedRoute component={Dashboard} /></PageWrapper>
           </Route>
-          <Route component={NotFound} />
+          <Route>
+            <PageWrapper><NotFound /></PageWrapper>
+          </Route>
         </Switch>
-      </main>
+      </AnimatePresence>
       <footer className="border-t border-border py-6 text-center text-sm text-muted-foreground">
-        <p>InvoiceBridge — Convert US invoices to Indian GST format instantly</p>
+        <p>InvoiceBridge — Convert global invoices to Indian GST format</p>
       </footer>
     </div>
   );

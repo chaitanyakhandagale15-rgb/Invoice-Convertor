@@ -1,0 +1,372 @@
+Add a premium **Re-convert Invoice** workflow to InvoiceBridge with advanced UX polish, conversion animations, and skeleton loading states.
+
+Goal:
+
+Make InvoiceBridge feel like a premium fintech SaaS product with highly polished interactions and visual feedback.
+
+Preserve all backend functionality.
+
+---
+
+# Core Feature
+
+Add:
+
+**Re-convert Invoice**
+
+Dashboard
+→ Re-convert
+→ Animated conversion processing
+→ Live recalculation
+→ Versioned regenerated invoice
+
+---
+
+# 1. Animated Conversion Experience
+
+Create a visually impressive invoice transformation animation.
+
+This is a major UX enhancement.
+
+---
+
+## During Convert / Re-convert
+
+Show a full animated processing state.
+
+Create:
+
+`src/components/invoice/conversion-animation.tsx`
+
+---
+
+## Animation Flow
+
+Step 1
+Source invoice card appears
+
+Example:
+
+🇬🇧 UK Invoice
+
+---
+
+Step 2
+Card moves through animated processing pipeline
+
+Effects:
+
+* glow pulse
+* shimmer scan line
+* moving conversion particles
+
+---
+
+Step 3
+Transformation visualization
+
+Show:
+
+```plaintext id="w7m2nq"
+VAT stripped
+↓
+Currency converted
+↓
+GST applied
+↓
+PDF generated
+```
+
+Animate each stage.
+
+---
+
+Step 4
+Indian GST invoice card emerges
+
+Example:
+
+🇮🇳 GST Invoice Ready
+
+---
+
+## Animation Style
+
+Use:
+
+Framer Motion
+
+Visual feel:
+
+Stripe / Linear style
+
+Elegant, minimal, premium
+
+Avoid cartoonish effects.
+
+---
+
+# 2. Skeleton Loading States
+
+Replace all plain spinners.
+
+Create:
+
+`src/components/common/skeleton-loader.tsx`
+
+---
+
+## Add Skeletons For
+
+### Dashboard
+
+Stats card skeletons
+
+Table row skeletons
+
+Animated shimmer effect
+
+---
+
+### Upload Page
+
+Processing card skeleton
+
+OCR extraction progress skeleton
+
+---
+
+### Convert Page
+
+Form skeleton
+
+Conversion summary skeleton
+
+Comparison card skeleton
+
+---
+
+### Download Page
+
+Invoice preview skeleton
+
+Button skeletons
+
+---
+
+# 3. Dashboard Re-convert UX Upgrade
+
+Redesign dashboard.
+
+---
+
+## Add Action Buttons
+
+Each row:
+
+* Download
+* Send Email
+* Re-convert
+* Delete
+
+Animated hover states.
+
+---
+
+## Re-convert Button Animation
+
+Hover:
+
+Rotate refresh icon subtly
+
+Click:
+
+Pulse transition
+
+---
+
+# 4. Convert Page Workspace Upgrade
+
+Redesign into premium conversion studio.
+
+---
+
+## Left Panel
+
+Editable invoice form
+
+Skeleton while loading.
+
+---
+
+## Right Panel
+
+Sticky live preview
+
+Animated recalculation.
+
+---
+
+# 5. Live Number Transition Animations
+
+When values change:
+
+Animate number transitions smoothly.
+
+Examples:
+
+₹83,000
+→
+₹95,810
+
+Use smooth counting animation.
+
+---
+
+# 6. Comparison Animation
+
+When reconverting:
+
+Animate old values morphing into new values.
+
+Highlight changed fields.
+
+Examples:
+
+Exchange Rate
+GST
+Final INR
+
+Use fade/slide transitions.
+
+---
+
+# 7. Upload Page Animation
+
+Improve upload UX.
+
+---
+
+## Drag-and-drop interactions
+
+Drag over:
+
+Glow border
+
+Lift card slightly
+
+Animated pulse
+
+---
+
+## Processing state
+
+Animated progress steps:
+
+Upload
+Extract
+Analyze
+Convert Ready
+
+---
+
+# 8. Dashboard Skeleton + Empty States
+
+Beautiful empty state illustration.
+
+Animated placeholder cards while loading.
+
+---
+
+# 9. Toast Animation Polish
+
+Upgrade toasts with:
+
+* slide-in
+* fade
+* icon animation
+
+States:
+
+Success
+Error
+Processing
+Warning
+
+---
+
+# 10. Route Transition Animation
+
+Add smooth page transitions between:
+
+* Dashboard
+* Upload
+* Convert
+* Download
+
+Subtle motion only.
+
+---
+
+# 11. Conversion Processing Modal
+
+When user clicks Convert / Re-convert:
+
+Show full-screen conversion animation modal.
+
+Message examples:
+
+Analyzing invoice structure...
+
+Normalizing tax system...
+
+Applying live exchange rates...
+
+Generating GST invoice...
+
+Preparing download...
+
+Then auto-transition to success page.
+
+---
+
+# 12. Premium Theme Polish
+
+Upgrade entire app.
+
+Use:
+
+* refined blue gradients
+* glass blur panels
+* soft elevation
+* modern fintech spacing
+* premium typography hierarchy
+
+---
+
+# 13. Performance
+
+Animations must remain smooth.
+
+Avoid excessive rendering.
+
+Skeletons should load instantly.
+
+---
+
+# 14. Final Experience Goal
+
+The app should feel like:
+
+A production-grade financial automation SaaS where users can visually watch invoices transform across countries into GST-compliant documents.
+
+The conversion process should feel:
+
+Fast
+Smart
+Trustworthy
+Premium
+
+---
+
+Preserve all backend logic while dramatically upgrading interaction quality.

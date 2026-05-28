@@ -267,6 +267,37 @@ router.get("/:id/download", async (req: Request, res: Response): Promise<void> =
   }
 });
 
+// POST /api/invoices/:id/reset  — reset CONVERTED back to EXTRACTED for re-conversion
+router.post("/:id/reset", async (req: Request, res: Response): Promise<void> => {
+  const id = paramId(req);
+  try {
+    const invoice = await db.query.invoicesTable.findFirst({
+      where: and(eq(invoicesTable.id, id), eq(invoicesTable.userId, req.userId)),
+    });
+    if (!invoice) {
+      res.status(404).json({ error: "Invoice not found" });
+      return;
+    }
+
+    await db.delete(convertedInvoicesTable).where(eq(convertedInvoicesTable.invoiceId, id));
+    const [updated] = await db.update(invoicesTable)
+      .set({ status: "EXTRACTED", updatedAt: new Date() })
+      .where(and(eq(invoicesTable.id, id), eq(invoicesTable.userId, req.userId)))
+      .returning();
+
+    // Best-effort delete old PDF
+    const { join } = await import("path");
+    const { unlink } = await import("fs/promises");
+    const pdfPath = join(process.cwd(), "data", "converted", `${id}.pdf`);
+    unlink(pdfPath).catch(() => {});
+
+    res.json(updated);
+  } catch (err) {
+    req.log.error({ err }, "Reset invoice error");
+    res.status(500).json({ error: "Failed to reset invoice" });
+  }
+});
+
 // POST /api/invoices/:id/send-email
 router.post("/:id/send-email", async (req: Request, res: Response): Promise<void> => {
   const id = paramId(req);
