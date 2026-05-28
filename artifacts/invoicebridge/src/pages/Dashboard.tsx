@@ -3,7 +3,7 @@ import { useListInvoices, useDeleteInvoice, getListInvoicesQueryKey } from "@wor
 import { useQueryClient } from "@tanstack/react-query";
 import { Link, useLocation } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
-import { FileCheck, IndianRupee, Calendar, TrendingUp, Download, Trash2, Upload, FileText, RefreshCw, Mail } from "lucide-react";
+import { FileCheck, IndianRupee, Calendar, TrendingUp, Download, Trash2, Upload, FileText, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -11,7 +11,6 @@ import { formatINR, getSourceCountry, SOURCE_COUNTRIES } from "@/lib/types";
 import type { SourceCountry } from "@/lib/types";
 import { format } from "date-fns";
 import { toast } from "sonner";
-import { SendEmailModal } from "@/components/SendEmailModal";
 
 const BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
 
@@ -29,7 +28,6 @@ export function Dashboard() {
   const [, navigate] = useLocation();
   const { data, isLoading } = useListInvoices({ page: 1, limit: 20 });
   const deleteMutation = useDeleteInvoice();
-  const [emailInvoiceId, setEmailInvoiceId] = useState<string | null>(null);
   const [reconvertingId, setReconvertingId] = useState<string | null>(null);
 
   const stats = data?.stats;
@@ -237,15 +235,6 @@ export function Dashboard() {
                                   <Button
                                     variant="ghost"
                                     size="icon"
-                                    className="h-7 w-7 text-blue-500 hover:text-blue-700"
-                                    title="Send by email"
-                                    onClick={() => setEmailInvoiceId(invoice.id)}
-                                  >
-                                    <Mail className="w-3.5 h-3.5" />
-                                  </Button>
-                                  <Button
-                                    variant="ghost"
-                                    size="icon"
                                     className="h-7 w-7 text-orange-500 hover:text-orange-700"
                                     title="Re-convert with new settings"
                                     onClick={() => handleReconvert(invoice.id)}
@@ -277,11 +266,6 @@ export function Dashboard() {
         </CardContent>
       </Card>
 
-      <SendEmailModal
-        invoiceId={emailInvoiceId ?? ""}
-        open={!!emailInvoiceId}
-        onClose={() => setEmailInvoiceId(null)}
-      />
     </div>
   );
 }

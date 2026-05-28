@@ -95,7 +95,7 @@ const pageVariants = {
   exit: { opacity: 0, y: -8 },
 };
 
-const pageTransition = { duration: 0.22, ease: "easeOut" };
+const pageTransition = { duration: 0.22, ease: "easeOut" as const };
 
 function PageWrapper({ children }: { children: React.ReactNode }) {
   return (

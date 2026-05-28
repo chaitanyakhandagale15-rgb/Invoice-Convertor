@@ -1,0 +1,280 @@
+Prepare InvoiceBridge for final production release, push to GitHub, and publish publicly.
+
+Goal:
+
+Finalize the app, remove unstable email functionality, clean production issues, push to GitHub, and deploy live.
+
+This is the final launch pass.
+
+Do NOT add new features.
+
+Focus only on:
+
+* production stability
+* GitHub readiness
+* deployment
+* launch preparation
+
+---
+
+# 1. Disable Email Feature
+
+Remove unstable Resend email functionality.
+
+---
+
+## Download Page
+
+Replace:
+
+Send by Email
+
+With disabled button:
+
+**Email Delivery (Coming Soon)**
+
+Add tooltip:
+
+Available in a future release
+
+---
+
+## Dashboard
+
+Remove email action.
+
+Keep:
+
+* Download
+* Re-convert
+* Delete
+
+---
+
+## Backend
+
+Disable `/api/send-email`
+
+Return:
+
+```json
+{
+  "message": "Coming soon"
+}
+```
+
+---
+
+# 2. Final Build Validation
+
+Run:
+
+```bash
+npm run build
+```
+
+Fix all:
+
+* TypeScript issues
+* lint errors
+* route build errors
+* hydration mismatches
+
+Build must succeed with zero blocking errors.
+
+---
+
+# 3. Production Cleanup
+
+Remove:
+
+* debug logs
+* unused imports
+* temporary test code
+* dead API handlers
+
+---
+
+# 4. Final Error Handling Audit
+
+Ensure graceful handling for:
+
+* failed uploads
+* OCR failures
+* exchange API failure
+* conversion errors
+* auth issues
+
+Show polished error UI.
+
+No raw HTTP 500 messages.
+
+---
+
+# 5. Generate Production README
+
+Create polished README.md.
+
+Include:
+
+## InvoiceBridge
+
+Multi-Country GST Invoice Conversion SaaS
+
+---
+
+### Features
+
+* Google Authentication
+* OCR Invoice Extraction
+* Multi-Country Conversion
+* Live Exchange Rates
+* GST Transformation
+* PDF Generation
+* Re-convert Workflow
+* Dashboard Analytics
+
+---
+
+### Tech Stack
+
+* Next.js
+* TypeScript
+* PostgreSQL
+* Clerk
+* Framer Motion
+* OCR
+* PDFKit
+
+---
+
+### Setup Instructions
+
+Installation
+
+Environment variables
+
+Local development
+
+Deployment steps
+
+---
+
+### Screenshots placeholders
+
+* Home
+* Upload
+* Convert
+* Dashboard
+* Download
+
+---
+
+# 6. GitHub Push Automation
+
+Prepare git repo.
+
+Run:
+
+```bash
+git add .
+git commit -m "release: InvoiceBridge v2 production launch"
+git branch -M main
+git push -u origin main
+```
+
+If remote is missing:
+
+Configure GitHub remote.
+
+Prompt for repository URL if needed.
+
+Example:
+
+```bash
+git remote add origin <github_repo_url>
+```
+
+---
+
+# 7. Create GitHub Release Quality
+
+Ensure repository includes:
+
+* clean folder structure
+* no node_modules
+* .env excluded
+* .gitignore correct
+* descriptive commit history
+
+---
+
+# 8. Vercel Deployment
+
+Prepare deployment.
+
+Connect GitHub repo to Vercel.
+
+---
+
+## Required Production Env Variables
+
+```env
+DATABASE_URL=
+NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=
+CLERK_SECRET_KEY=
+```
+
+---
+
+Validate:
+
+* production database connectivity
+* auth works
+* API routes work
+* PDF generation works
+
+---
+
+# 9. Deploy Publicly
+
+Deploy and verify live app.
+
+Confirm:
+
+* landing page loads
+* sign-in works
+* upload works
+* convert works
+* dashboard works
+* re-convert works
+
+---
+
+# 10. Final Launch Polish
+
+Verify:
+
+* navbar animations
+* conversion animation
+* success page
+* skeleton loading
+* responsive design
+
+---
+
+# Final Deliverable
+
+Produce:
+
+### GitHub Repository
+
+Public and clean
+
+### Live Vercel Deployment
+
+Working production URL
+
+### Deployment success confirmation
+
+InvoiceBridge should now be fully launched as a public production-ready SaaS portfolio project.

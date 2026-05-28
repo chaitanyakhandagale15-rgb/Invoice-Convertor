@@ -1,4 +1,3 @@
-import { useState } from "react";
 import { useParams } from "wouter";
 import { useGetInvoice } from "@workspace/api-client-react";
 import { Link } from "wouter";
@@ -7,10 +6,10 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/components/ui/tooltip";
 import { formatINR, getSourceCountry } from "@/lib/types";
 import type { SourceCountry } from "@/lib/types";
 import { motion } from "framer-motion";
-import { SendEmailModal } from "@/components/SendEmailModal";
 
 const BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
 
@@ -18,14 +17,13 @@ const stagger = {
   container: { animate: { transition: { staggerChildren: 0.1, delayChildren: 0.3 } } },
   item: {
     initial: { opacity: 0, y: 20 },
-    animate: { opacity: 1, y: 0, transition: { duration: 0.4, ease: "easeOut" } },
+    animate: { opacity: 1, y: 0, transition: { duration: 0.4, ease: "easeOut" as const } },
   },
 };
 
 export function DownloadPage() {
   const { id } = useParams<{ id: string }>();
   const { data: invoice, isLoading } = useGetInvoice(id);
-  const [emailOpen, setEmailOpen] = useState(false);
 
   // ─── Skeleton ─────────────────────────────────────────────────────────────
   if (isLoading) return (
@@ -221,15 +219,24 @@ export function DownloadPage() {
             </button>
           </a>
 
-          {/* Secondary: Email */}
-          <Button
-            variant="outline"
-            className="w-full h-11 gap-2 border-primary/25 text-primary hover:bg-primary/5 hover:border-primary/40 font-medium"
-            onClick={() => setEmailOpen(true)}
-          >
-            <Mail className="w-4 h-4" />
-            Send by Email
-          </Button>
+          {/* Secondary: Email (Coming Soon) */}
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span className="block">
+                  <Button
+                    variant="outline"
+                    className="w-full h-11 gap-2 border-muted text-muted-foreground cursor-not-allowed opacity-60 font-medium"
+                    disabled
+                  >
+                    <Mail className="w-4 h-4" />
+                    Email Delivery (Coming Soon)
+                  </Button>
+                </span>
+              </TooltipTrigger>
+              <TooltipContent>Available in a future release</TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
 
           {/* Tertiary: Navigation */}
           <div className="grid grid-cols-2 gap-3">
@@ -246,8 +253,6 @@ export function DownloadPage() {
           </div>
         </motion.div>
       </motion.div>
-
-      <SendEmailModal invoiceId={id} open={emailOpen} onClose={() => setEmailOpen(false)} />
     </div>
   );
 }

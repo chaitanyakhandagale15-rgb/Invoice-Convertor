@@ -65,6 +65,7 @@ export function ConversionAnimation({ open, sourceCountry, error, onDone }: Conv
       const t = setTimeout(onDone, 400);
       return () => clearTimeout(t);
     }
+    return undefined;
   }, [open, error, onDone]);
 
   return (
