@@ -1,2 +1,3 @@
 - [InvoiceBridge architecture](invoicebridge-arch.md) — OCR is browser-side; upload endpoint excluded from OpenAPI codegen; Express 5 params quirk
 - [Clerk Auth Setup](clerk-auth-setup.md) — Replit-managed Clerk wired to Express+React+Vite; key pitfalls documented
+- [pdfkit esbuild bundling](pdfkit-esbuild.md) — pdfkit + fontkit must be externalized in build.mjs; bundling them breaks @swc/helpers resolution at runtime

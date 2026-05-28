@@ -1,0 +1,256 @@
+# 15. Fix HTTP 500 “Failed to Convert Invoice”
+
+The Convert flow occasionally throws:
+
+**HTTP 500 Internal Server Error: Failed to convert invoice**
+
+Diagnose and permanently fix this.
+
+Preserve all current functionality.
+
+---
+
+## Add Full Error Diagnostics
+
+Update:
+
+`src/app/api/convert/route.ts`
+
+Wrap conversion logic in robust try/catch.
+
+Log detailed structured errors:
+
+```typescript
+console.error("Convert API Error:", {
+  message: error.message,
+  stack: error.stack,
+  invoiceId,
+  requestBody
+});
+```
+
+Return meaningful responses instead of generic 500.
+
+Example:
+
+```json
+{
+  "error": "Exchange rate fetch failed"
+}
+```
+
+or
+
+```json
+{
+  "error": "Invoice data extraction incomplete"
+}
+```
+
+---
+
+## Validate Incoming Payload
+
+Before conversion, validate:
+
+### Required fields
+
+* invoiceId
+* sourceCountry
+* exchangeRate
+* gstRate
+* lineItems
+* amount
+
+Reject invalid requests with:
+
+HTTP 400
+
+Clear message.
+
+---
+
+## Handle Missing OCR Data Gracefully
+
+If extracted invoice fields are incomplete:
+
+Fallback safely.
+
+Examples:
+
+If amount missing:
+
+Attempt derive from line items
+
+---
+
+If currency missing:
+
+Use source country default
+
+---
+
+If tax missing:
+
+Default to 0
+
+Do not crash conversion.
+
+---
+
+## Protect Exchange Rate Fetch
+
+If live exchange API fails:
+
+Fallback to country default rate.
+
+Examples:
+
+USD → 83
+GBP → 105
+EUR → 90
+CAD → 61
+AUD → 55
+
+Show warning toast:
+
+Using fallback exchange rate
+
+Conversion must continue.
+
+---
+
+## PDF Generation Protection
+
+Wrap PDF generation in try/catch.
+
+If pdfkit fails:
+
+Return descriptive error.
+
+Do not silently throw 500.
+
+---
+
+## Database Write Protection
+
+Validate DB write operations.
+
+If ConvertedInvoice insert fails:
+
+Return:
+
+"Failed to save converted invoice"
+
+---
+
+## Re-convert Edge Cases
+
+Handle:
+
+* missing historical version
+* deleted invoice
+* invalid version reference
+
+Gracefully.
+
+---
+
+## Frontend Error UX
+
+Update Convert page.
+
+If conversion fails:
+
+Show polished error card.
+
+Display:
+
+Conversion Failed
+
+Detailed reason
+
+Retry button
+
+Back to Upload button
+
+Do NOT show raw HTTP 500.
+
+---
+
+## Add Conversion Retry
+
+If conversion fails:
+
+Allow instant retry without losing form state.
+
+Preserve all user-entered values.
+
+---
+
+## Add Loading Timeout Protection
+
+If conversion exceeds 15 seconds:
+
+Show:
+
+Still processing...
+
+with retry guidance.
+
+---
+
+## Add Defensive Conversion Logic
+
+Update converter.
+
+Guard against:
+
+* NaN totals
+* undefined tax
+* negative values
+* empty line items
+
+Auto-sanitize inputs.
+
+---
+
+## Add Success / Failure Toasts
+
+Success:
+
+Invoice converted successfully
+
+Failure:
+
+Conversion failed. Please review invoice details.
+
+---
+
+## Add Test Coverage
+
+Test convert flow with:
+
+* US invoice
+* UK invoice
+* EU invoice
+* malformed invoice
+* missing amount
+* exchange API failure
+* PDF generation failure
+
+Ensure no unhandled 500 errors remain.
+
+---
+
+# Final Goal
+
+Conversion should never fail silently.
+
+Users should always receive:
+
+* successful conversion
+  OR
+* clear actionable error message
+
+Eliminate generic HTTP 500 conversion failures completely.

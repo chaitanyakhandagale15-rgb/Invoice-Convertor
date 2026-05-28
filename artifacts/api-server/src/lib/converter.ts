@@ -145,16 +145,43 @@ function todayFormatted(): string {
   return `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}/${d.getFullYear()}`;
 }
 
+function safeNum(val: unknown, fallback = 0): number {
+  const n = Number(val);
+  return isFinite(n) && !isNaN(n) ? Math.max(0, n) : fallback;
+}
+
+function sanitizeLineItem(item: Partial<LineItem>, idx: number): LineItem {
+  const qty = safeNum(item.quantity, 1);
+  const unitPrice = safeNum(item.unitPrice, 0);
+  const amount = safeNum(item.amount, qty * unitPrice);
+  return {
+    sno: safeNum(item.sno, idx + 1) || idx + 1,
+    description: item.description?.trim() || `Item ${idx + 1}`,
+    hsnCode: item.hsnCode?.trim() || "9954",
+    quantity: qty,
+    unitPrice,
+    amount,
+  };
+}
+
 export function convertInvoice(extracted: ExtractedInvoice, options: ConversionOptions): ConvertedInvoiceData {
-  const { exchangeRate, gstRate, supplyType, sellerGSTIN, buyerGSTIN, placeOfSupply, stateCode } = options;
+  const exchangeRate = safeNum(options.exchangeRate, 83);
+  const gstRate = safeNum(options.gstRate, 18);
+  const { supplyType, sellerGSTIN, buyerGSTIN, placeOfSupply, stateCode } = options;
   const isInterState = supplyType === "inter-state";
   const halfGSTRate = gstRate / 2;
 
   const sourceCountry: SourceCountry = options.sourceCountry ?? extracted.sourceCountry ?? "US";
   const rule = getCountryRule(sourceCountry);
 
+  // Sanitize line items — guard against empty array, NaN amounts, missing fields
+  const rawItems: Partial<LineItem>[] = Array.isArray(extracted.lineItems) && extracted.lineItems.length > 0
+    ? extracted.lineItems
+    : [{ sno: 1, description: "Service", hsnCode: "9954", quantity: 1, unitPrice: safeNum(extracted.total, 0), amount: safeNum(extracted.total, 0) }];
+
   // Normalize each line item: strip source tax, convert to INR, apply Indian GST
-  const convertedItems: ConvertedLineItem[] = extracted.lineItems.map((item) => {
+  const convertedItems: ConvertedLineItem[] = rawItems.map((rawItem, idx) => {
+    const item = sanitizeLineItem(rawItem, idx);
     // Use item.amount as-is (already pre-tax per line item)
     const taxableValueINR = round2(item.amount * exchangeRate);
     const rateINR = round2(item.unitPrice * exchangeRate);

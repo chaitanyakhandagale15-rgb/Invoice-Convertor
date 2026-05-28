@@ -29,6 +29,10 @@ async function buildAll() {
     // - use path traversal to read files (e.g. @google-cloud/secret-manager loads sibling .proto files)
     external: [
       "*.node",
+      // pdfkit and fontkit use @swc/helpers internally which cannot be bundled
+      // correctly by esbuild — externalize them so they load from node_modules at runtime
+      "pdfkit",
+      "fontkit",
       "sharp",
       "better-sqlite3",
       "sqlite3",

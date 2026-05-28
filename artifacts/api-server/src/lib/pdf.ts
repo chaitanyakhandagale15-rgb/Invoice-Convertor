@@ -25,7 +25,9 @@ function todayFull(): string {
 }
 
 export async function generateGSTInvoicePDF(data: ConvertedInvoiceData): Promise<Buffer> {
-  const PDFDocument = (await import("pdfkit")).default;
+  // pdfkit is a CJS module — `.default` may be the constructor directly when externalized
+  const pdfkitPkg = await import("pdfkit");
+  const PDFDocument = (pdfkitPkg.default ?? pdfkitPkg) as unknown as new (opts: object) => PDFKit.PDFDocument;
 
   return new Promise((resolve, reject) => {
     const doc = new PDFDocument({

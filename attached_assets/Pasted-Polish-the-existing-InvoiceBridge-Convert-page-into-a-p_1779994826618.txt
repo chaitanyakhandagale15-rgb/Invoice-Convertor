@@ -1,0 +1,314 @@
+Polish the existing InvoiceBridge Convert page into a premium fintech SaaS experience.
+
+The page is already fully functional.
+
+Do NOT change backend logic.
+
+Focus entirely on:
+
+* UI refinement
+* UX improvements
+* visual hierarchy
+* conversion animation
+* skeleton loading
+* premium interaction polish
+
+Current Convert page is functional but feels too compressed and utilitarian.
+
+Transform it into a polished product comparable to:
+
+* Stripe
+* Linear
+* Vercel
+
+---
+
+# 1. Add Premium Conversion Animation
+
+Create:
+
+`src/components/invoice/conversion-animation.tsx`
+
+Place at top of Convert page below header.
+
+---
+
+## Animated Flow
+
+Show invoice transformation visually:
+
+🇺🇸 / 🇬🇧 / 🇪🇺 / 🇨🇦 / 🇦🇺 Source Invoice
+↓
+Tax Normalization
+↓
+Live Currency Conversion
+↓
+GST Application
+↓
+🇮🇳 GST Invoice Ready
+
+---
+
+## Animation Requirements
+
+Use Framer Motion.
+
+Include:
+
+* flowing animated connector line
+* pulsing processing nodes
+* moving shimmer effect
+* smooth country card transitions
+* glow pulse when conversion completes
+
+Style should feel premium and subtle.
+
+---
+
+# 2. Add Skeleton Loading States
+
+Create:
+
+`src/components/common/skeleton-loader.tsx`
+
+Replace all loading spinners.
+
+---
+
+## Add skeletons for:
+
+### Exchange Rate Loading
+
+Show animated shimmer placeholder
+
+---
+
+### OCR Extraction Loading
+
+Skeleton invoice form
+
+---
+
+### Conversion Summary Loading
+
+Animated summary card placeholders
+
+---
+
+### Re-convert Loading
+
+Full panel skeleton state
+
+---
+
+# 3. Improve Page Spacing
+
+Increase breathing room across entire layout.
+
+Apply:
+
+* larger section spacing
+* more card padding
+* increased vertical rhythm
+* cleaner whitespace between form groups
+
+Current layout feels too tight.
+
+Make it more open and premium.
+
+---
+
+# 4. Upgrade Card Hierarchy
+
+Redesign cards with visual priority.
+
+---
+
+## Conversion Summary Card
+
+Make primary focal card.
+
+Add:
+
+* blue gradient border
+* elevated shadow
+* glass blur background
+* subtle animated glow
+
+---
+
+## Other Cards
+
+Keep softer white backgrounds with subtle shadow.
+
+---
+
+# 5. Improve Input Design
+
+Upgrade all form inputs.
+
+Apply:
+
+* taller fields
+* softer border radius
+* cleaner focus glow
+* improved typography
+* smoother hover states
+
+Make them feel modern and premium.
+
+---
+
+# 6. Grand Total Emphasis
+
+Redesign total display.
+
+Current total is too visually weak.
+
+Upgrade:
+
+* much larger font
+* strong blue emphasis
+* animated value transitions
+* highlighted summary block
+
+This should be the visual anchor.
+
+---
+
+# 7. Add Progress Stepper
+
+Add top horizontal progress tracker.
+
+Steps:
+
+Upload
+Extract
+Convert
+Generate PDF
+
+Highlight current step.
+
+Animate active state.
+
+---
+
+# 8. Upgrade Generate Button
+
+Current CTA needs stronger visual presence.
+
+Redesign:
+
+Large premium button
+
+Add:
+
+* blue gradient
+* icon animation
+* subtle shine sweep
+* hover elevation
+* loading morph animation
+
+Text:
+
+Generate GST Invoice PDF
+
+---
+
+# 9. Live Number Animation
+
+When values change:
+
+Animate totals smoothly.
+
+Examples:
+
+₹95,810
+→
+₹1,13,055
+
+Use count-up transitions.
+
+---
+
+# 10. Conversion Summary Enhancements
+
+Add visual tax breakdown bars.
+
+Show:
+
+Original Amount
+Converted INR
+GST Applied
+Final Total
+
+With animated progress bars.
+
+---
+
+# 11. Route Card Polish
+
+Upgrade top country conversion route card.
+
+Add:
+
+* country flags with glow
+* animated arrow flow
+* cleaner tax mapping display
+* subtle hover motion
+
+Make route feel like an active conversion pipeline.
+
+---
+
+# 12. Better Empty / Error States
+
+For failed OCR or exchange rate failure:
+
+Create elegant states with:
+
+* clear messaging
+* retry action
+* branded visuals
+
+---
+
+# 13. Footer Polish
+
+Replace plain footer.
+
+New footer:
+
+Global Invoice Conversion Platform
+
+with subtle branded styling.
+
+---
+
+# 14. Responsive Refinement
+
+Improve tablet + desktop layout balance.
+
+Ensure:
+
+Convert page scales beautifully.
+
+Avoid cramped side-by-side sections.
+
+---
+
+# Final UX Goal
+
+The Convert page should feel like the signature experience of InvoiceBridge.
+
+Users should feel they are watching a professional financial transformation engine process their invoice in real time.
+
+The experience should feel:
+
+Smart
+Fast
+Trustworthy
+Premium
+Commercially launchable
+
+Preserve all functionality while dramatically improving aesthetics and interaction quality.

@@ -197,13 +197,30 @@ router.post("/:id/extract", async (req: Request, res: Response): Promise<void> =
 // POST /api/invoices/:id/convert
 router.post("/:id/convert", async (req: Request, res: Response): Promise<void> => {
   const id = paramId(req);
+  let stage = "validation";
   try {
     const { extractedData, conversionOptions } = req.body as { extractedData: unknown; conversionOptions: unknown };
-    if (!extractedData || !conversionOptions) {
-      res.status(400).json({ error: "Missing required fields" });
+
+    // Validate required payload fields
+    if (!extractedData || typeof extractedData !== "object") {
+      res.status(400).json({ error: "Missing or invalid extractedData" });
+      return;
+    }
+    if (!conversionOptions || typeof conversionOptions !== "object") {
+      res.status(400).json({ error: "Missing or invalid conversionOptions" });
+      return;
+    }
+    const opts = conversionOptions as Record<string, unknown>;
+    if (!opts["exchangeRate"] || isNaN(Number(opts["exchangeRate"])) || Number(opts["exchangeRate"]) <= 0) {
+      res.status(400).json({ error: "Invalid exchangeRate — must be a positive number" });
+      return;
+    }
+    if (!opts["gstRate"] && opts["gstRate"] !== 0) {
+      res.status(400).json({ error: "Missing gstRate" });
       return;
     }
 
+    stage = "database-lookup";
     const ownerCheck = await db.query.invoicesTable.findFirst({
       where: and(eq(invoicesTable.id, id), eq(invoicesTable.userId, req.userId)),
     });
@@ -211,13 +228,34 @@ router.post("/:id/convert", async (req: Request, res: Response): Promise<void> =
       res.status(404).json({ error: "Invoice not found" });
       return;
     }
+    if (ownerCheck.status === "UPLOADED") {
+      res.status(400).json({ error: "Invoice data not yet extracted — please complete OCR first" });
+      return;
+    }
 
+    stage = "status-update";
     await db.update(invoicesTable).set({ status: "CONVERTING", updatedAt: new Date() }).where(eq(invoicesTable.id, id));
 
+    // Idempotent: remove any existing converted record before inserting fresh
+    // Handles re-convert and double-submit without unique-constraint errors
+    stage = "cleanup";
+    await db.delete(convertedInvoicesTable).where(eq(convertedInvoicesTable.invoiceId, id)).catch(() => {});
+
+    stage = "converter";
     const convertedData = convertInvoice(extractedData as ExtractedInvoice, conversionOptions as ConversionOptions);
+
+    // Guard: if line-item sanitization produced an empty invoice, warn but continue
+    if (!convertedData.lineItems.length) {
+      req.log.warn({ id }, "Conversion produced no line items — check extracted data");
+    }
+
+    stage = "pdf";
     const pdfBuffer = await generateGSTInvoicePDF(convertedData);
+
+    stage = "file-save";
     const pdfPath = await saveConvertedPDF(pdfBuffer, id);
 
+    stage = "database-insert";
     const [convertedInvoice] = await db.insert(convertedInvoicesTable).values({
       invoiceId: id,
       inrAmount: convertedData.totalAfterRoundOffINR,
@@ -230,13 +268,26 @@ router.post("/:id/convert", async (req: Request, res: Response): Promise<void> =
       pdfPath,
     }).returning();
 
+    stage = "status-converted";
     await db.update(invoicesTable).set({ status: "CONVERTED", updatedAt: new Date() }).where(eq(invoicesTable.id, id));
 
     res.json({ convertedInvoiceId: convertedInvoice.id, pdfPath, convertedData });
   } catch (err) {
-    req.log.error({ err }, "Conversion error");
+    req.log.error({ err, stage, invoiceId: id }, "Conversion error");
     await db.update(invoicesTable).set({ status: "FAILED", updatedAt: new Date() }).where(eq(invoicesTable.id, id)).catch(() => {});
-    res.status(500).json({ error: "Failed to convert invoice" });
+
+    const stageMessages: Record<string, string> = {
+      "database-lookup": "Invoice lookup failed — please try again",
+      "status-update": "Could not update invoice status",
+      "cleanup": "Failed to clear previous conversion",
+      "converter": "Invoice calculation failed — check line items and exchange rate",
+      "pdf": "PDF generation failed — invoice data may be incomplete",
+      "file-save": "Failed to save the generated PDF",
+      "database-insert": "Failed to save converted invoice to database",
+      "status-converted": "Conversion complete but status update failed",
+    };
+    const message = stageMessages[stage] ?? "Failed to convert invoice";
+    res.status(500).json({ error: message, stage });
   }
 });
 
