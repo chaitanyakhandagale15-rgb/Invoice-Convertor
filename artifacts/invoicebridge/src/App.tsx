@@ -207,8 +207,29 @@ function AppRouter() {
           </Route>
         </Switch>
       </AnimatePresence>
-      <footer className="border-t border-border py-6 text-center text-sm text-muted-foreground">
-        <p>InvoiceBridge — Convert global invoices to Indian GST format</p>
+      <footer className="border-t border-border/60 bg-muted/20 mt-auto">
+        <div className="max-w-7xl mx-auto px-6 py-8">
+          <div className="flex flex-col items-center gap-4 text-center">
+            <div className="flex items-center gap-2.5">
+              <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center">
+                <svg className="w-3.5 h-3.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+              </div>
+              <span className="font-bold text-base bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
+                InvoiceBridge
+              </span>
+            </div>
+            <p className="text-sm text-muted-foreground font-medium">Global Invoice Conversion Platform</p>
+            <div className="flex items-center gap-2 flex-wrap justify-center">
+              {["🌍 Multi-Country", "📡 Live Exchange Rates", "✅ GST Compliant"].map((badge) => (
+                <span key={badge} className="text-xs px-2.5 py-1 rounded-full bg-background border border-border/60 text-muted-foreground font-medium">
+                  {badge}
+                </span>
+              ))}
+            </div>
+          </div>
+        </div>
       </footer>
     </div>
   );

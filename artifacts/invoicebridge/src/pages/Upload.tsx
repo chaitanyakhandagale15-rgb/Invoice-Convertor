@@ -1,19 +1,26 @@
 import { useState, useRef, useCallback } from "react";
 import { useLocation } from "wouter";
-import { Upload as UploadIcon, FileText, X, CheckCircle, AlertCircle, Globe } from "lucide-react";
+import { Upload as UploadIcon, FileText, X, CheckCircle, AlertCircle, Globe, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { extractInvoiceData } from "@/lib/ocr";
 import { SOURCE_COUNTRIES, type SourceCountry } from "@/lib/types";
 import type { ExtractedInvoice } from "@/lib/types";
 import { toast } from "sonner";
 
-const STEPS = ["Uploading file", "Extracting text", "Processing data", "Complete"];
+const BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
+
+const STEPS = [
+  { label: "Uploading file", sublabel: "Sending to server..." },
+  { label: "OCR extraction", sublabel: "Reading invoice text..." },
+  { label: "Processing data", sublabel: "Structuring invoice fields..." },
+  { label: "Complete", sublabel: "Ready to convert!" },
+];
 
 export function Upload() {
   const [, navigate] = useLocation();
@@ -65,10 +72,9 @@ export function Upload() {
     setStepLabel("Uploading file...");
 
     try {
-      // Step 1: Upload file to server
       const formData = new FormData();
       formData.append("file", file);
-      const uploadRes = await fetch("/api/invoices", { method: "POST", body: formData });
+      const uploadRes = await fetch(`${BASE}/api/invoices`, { method: "POST", body: formData });
       if (!uploadRes.ok) {
         const err = await uploadRes.json();
         throw new Error(err.error || "Upload failed");
@@ -77,7 +83,6 @@ export function Upload() {
       setProgress(15);
       setStep(1);
 
-      // Step 2: Client-side OCR extraction
       setStepLabel("Extracting text from document...");
       let extracted: ExtractedInvoice;
       try {
@@ -98,19 +103,16 @@ export function Upload() {
           total: 0,
           currency: selectedCountry.currency,
         };
-        toast.warning("OCR extraction was limited. Please fill in the details manually.");
+        toast.warning("OCR extraction was limited — please fill in the details manually.");
       }
 
-      // Attach source country + currency from user selection
       extracted.sourceCountry = sourceCountry;
       extracted.currency = selectedCountry.currency;
-
       setProgress(88);
       setStep(2);
       setStepLabel("Saving extracted data...");
 
-      // Step 3: Save extracted data
-      const extractRes = await fetch(`/api/invoices/${invoiceId}/extract`, {
+      const extractRes = await fetch(`${BASE}/api/invoices/${invoiceId}/extract`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ extractedData: extracted, sourceCountry }),
@@ -120,8 +122,7 @@ export function Upload() {
       setProgress(100);
       setStep(3);
       setStepLabel("Complete!");
-
-      await new Promise((r) => setTimeout(r, 800));
+      await new Promise((r) => setTimeout(r, 700));
       navigate(`/convert/${invoiceId}`);
     } catch (err: any) {
       setError(err.message || "Something went wrong. Please try again.");
@@ -130,156 +131,276 @@ export function Upload() {
   };
 
   return (
-    <div className="max-w-2xl mx-auto px-4 py-12">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold mb-2">Upload Invoice</h1>
+    <div className="max-w-2xl mx-auto px-6 py-12">
+      <motion.div
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="mb-8"
+      >
+        <h1 className="text-3xl font-bold tracking-tight mb-2">Upload Invoice</h1>
         <p className="text-muted-foreground">Upload an invoice PDF or image and convert it to Indian GST format</p>
-      </div>
+      </motion.div>
 
-      {!processing ? (
-        <div className="space-y-6">
-          {/* Source Country Selector */}
-          <Card className="border-primary/20">
-            <CardContent className="p-5">
-              <Label className="text-sm font-semibold mb-3 flex items-center gap-2">
-                <Globe className="w-4 h-4 text-primary" />
-                Invoice Origin Country
-              </Label>
-              <Select value={sourceCountry} onValueChange={(v) => setSourceCountry(v as SourceCountry)}>
-                <SelectTrigger className="mt-2">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {SOURCE_COUNTRIES.map((c) => (
-                    <SelectItem key={c.code} value={c.code}>
-                      <span className="flex items-center gap-2">
-                        <span>{c.flag}</span>
-                        <span>{c.name}</span>
-                        <span className="text-muted-foreground text-xs">({c.currency} · {c.taxSystemName})</span>
-                      </span>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              {sourceCountry && (
-                <div className="mt-3 flex items-center gap-3 p-3 rounded-lg bg-muted/50">
-                  <span className="text-2xl">{selectedCountry.flag}</span>
-                  <div className="text-sm">
-                    <p className="font-medium">{selectedCountry.name} → India</p>
-                    <p className="text-muted-foreground">{selectedCountry.taxSystemName} → Indian GST · {selectedCountry.currency}</p>
-                  </div>
-                </div>
+      <AnimatePresence mode="wait">
+        {!processing ? (
+          <motion.div
+            key="upload-form"
+            initial={{ opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -12 }}
+            transition={{ duration: 0.3 }}
+            className="space-y-5"
+          >
+            {/* Country selector */}
+            <Card className="border-primary/20 shadow-sm">
+              <CardContent className="p-5">
+                <Label className="text-sm font-semibold mb-3 flex items-center gap-2">
+                  <Globe className="w-4 h-4 text-primary" />
+                  Invoice Origin Country
+                </Label>
+                <Select value={sourceCountry} onValueChange={(v) => setSourceCountry(v as SourceCountry)}>
+                  <SelectTrigger className="mt-2 h-11">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {SOURCE_COUNTRIES.map((c) => (
+                      <SelectItem key={c.code} value={c.code}>
+                        <span className="flex items-center gap-2">
+                          <span>{c.flag}</span>
+                          <span className="font-medium">{c.name}</span>
+                          <span className="text-muted-foreground text-xs">({c.currency} · {c.taxSystemName})</span>
+                        </span>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <AnimatePresence mode="wait">
+                  <motion.div
+                    key={sourceCountry}
+                    initial={{ opacity: 0, y: 4 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -4 }}
+                    transition={{ duration: 0.2 }}
+                    className="mt-3 flex items-center gap-3 p-3 rounded-xl bg-muted/50"
+                  >
+                    <span className="text-2xl">{selectedCountry.flag}</span>
+                    <div className="text-sm">
+                      <p className="font-semibold">{selectedCountry.name} → 🇮🇳 India</p>
+                      <p className="text-muted-foreground text-xs">{selectedCountry.taxSystemName} → Indian GST · {selectedCountry.currency} → INR</p>
+                    </div>
+                  </motion.div>
+                </AnimatePresence>
+              </CardContent>
+            </Card>
+
+            {/* Dropzone */}
+            <motion.div
+              animate={{
+                scale: dragOver ? 1.015 : 1,
+                boxShadow: dragOver
+                  ? "0 0 0 2px #2563eb, 0 8px 24px rgba(37,99,235,0.15)"
+                  : file
+                  ? "0 0 0 2px #22c55e, 0 4px 12px rgba(34,197,94,0.1)"
+                  : "none",
+              }}
+              transition={{ type: "spring", stiffness: 300, damping: 25 }}
+              className={cn(
+                "relative border-2 border-dashed rounded-2xl p-12 text-center cursor-pointer transition-colors",
+                dragOver
+                  ? "border-primary bg-primary/5"
+                  : file
+                  ? "border-green-400 bg-green-50/50"
+                  : "border-border hover:border-primary/40 hover:bg-muted/20"
               )}
-            </CardContent>
-          </Card>
+              onDragOver={(e: React.DragEvent) => { e.preventDefault(); setDragOver(true); }}
+              onDragLeave={() => setDragOver(false)}
+              onDrop={onDrop}
+              onClick={() => !file && fileRef.current?.click()}
+            >
+              <input
+                ref={fileRef}
+                type="file"
+                accept=".pdf,.png,.jpg,.jpeg"
+                className="hidden"
+                onChange={(e) => e.target.files?.[0] && handleFile(e.target.files[0])}
+              />
 
-          {/* Dropzone */}
-          <div
-            className={cn(
-              "relative border-2 border-dashed rounded-2xl p-12 text-center transition-all cursor-pointer",
-              dragOver
-                ? "border-primary bg-primary/5 scale-[1.02]"
-                : file
-                ? "border-green-400 bg-green-50"
-                : "border-border hover:border-primary/50 hover:bg-muted/30"
-            )}
-            onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
-            onDragLeave={() => setDragOver(false)}
-            onDrop={onDrop}
-            onClick={() => !file && fileRef.current?.click()}
-          >
-            <input
-              ref={fileRef}
-              type="file"
-              accept=".pdf,.png,.jpg,.jpeg"
-              className="hidden"
-              onChange={(e) => e.target.files?.[0] && handleFile(e.target.files[0])}
-            />
+              <AnimatePresence mode="wait">
+                {file ? (
+                  <motion.div
+                    key="file-selected"
+                    initial={{ opacity: 0, scale: 0.9 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.9 }}
+                    className="space-y-3"
+                  >
+                    <motion.div
+                      initial={{ scale: 0 }}
+                      animate={{ scale: 1 }}
+                      transition={{ type: "spring", stiffness: 280, damping: 18 }}
+                      className="w-16 h-16 rounded-2xl bg-green-100 flex items-center justify-center mx-auto"
+                    >
+                      <CheckCircle className="w-8 h-8 text-green-600" />
+                    </motion.div>
+                    <div>
+                      <p className="font-bold text-lg">{file.name}</p>
+                      <p className="text-muted-foreground text-sm">{formatSize(file.size)}</p>
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={(e) => { e.stopPropagation(); setFile(null); }}
+                      className="gap-2"
+                    >
+                      <X className="w-4 h-4" /> Remove file
+                    </Button>
+                  </motion.div>
+                ) : (
+                  <motion.div
+                    key="drop-zone"
+                    initial={{ opacity: 0, scale: 0.95 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.95 }}
+                    className="space-y-4"
+                  >
+                    <motion.div
+                      animate={{ y: dragOver ? -6 : 0 }}
+                      transition={{ type: "spring", stiffness: 300 }}
+                      className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center mx-auto"
+                    >
+                      <UploadIcon className="w-8 h-8 text-primary" />
+                    </motion.div>
+                    <div>
+                      <p className="text-lg font-bold">
+                        {dragOver ? "Release to upload" : "Drag & drop your invoice here"}
+                      </p>
+                      <p className="text-muted-foreground mt-1 text-sm">or click to browse files</p>
+                    </div>
+                    <div className="flex items-center justify-center gap-2 flex-wrap">
+                      {["PDF", "PNG", "JPG"].map((fmt) => (
+                        <Badge key={fmt} variant="secondary" className="text-xs">{fmt}</Badge>
+                      ))}
+                      <span className="text-muted-foreground text-sm">· Up to 10MB</span>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </motion.div>
 
-            {file ? (
-              <div className="space-y-3">
-                <div className="w-16 h-16 rounded-xl bg-green-100 flex items-center justify-center mx-auto">
-                  <CheckCircle className="w-8 h-8 text-green-600" />
-                </div>
-                <div>
-                  <p className="font-semibold text-lg">{file.name}</p>
-                  <p className="text-muted-foreground text-sm">{formatSize(file.size)}</p>
-                </div>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={(e) => { e.stopPropagation(); setFile(null); }}
-                  className="gap-2"
+            {/* Error */}
+            <AnimatePresence>
+              {error && (
+                <motion.div
+                  initial={{ opacity: 0, y: 6 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0 }}
+                  className="flex items-start gap-3 p-4 rounded-xl bg-destructive/8 border border-destructive/20 text-destructive"
                 >
-                  <X className="w-4 h-4" /> Remove file
-                </Button>
-              </div>
-            ) : (
-              <div className="space-y-4">
-                <div className="w-16 h-16 rounded-xl bg-primary/10 flex items-center justify-center mx-auto">
-                  <UploadIcon className="w-8 h-8 text-primary" />
-                </div>
-                <div>
-                  <p className="text-lg font-semibold">Drag & drop your invoice here</p>
-                  <p className="text-muted-foreground mt-1">or click to browse files</p>
-                </div>
-                <div className="flex items-center justify-center gap-2">
-                  {["PDF", "PNG", "JPG"].map((fmt) => (
-                    <Badge key={fmt} variant="secondary" className="text-xs">{fmt}</Badge>
-                  ))}
-                  <span className="text-muted-foreground text-sm">· Up to 10MB</span>
-                </div>
-              </div>
-            )}
-          </div>
+                  <AlertCircle className="w-5 h-5 mt-0.5 shrink-0" />
+                  <p className="text-sm">{error}</p>
+                </motion.div>
+              )}
+            </AnimatePresence>
 
-          {error && (
-            <div className="flex items-start gap-3 p-4 rounded-xl bg-destructive/10 border border-destructive/20 text-destructive">
-              <AlertCircle className="w-5 h-5 mt-0.5 shrink-0" />
-              <p className="text-sm">{error}</p>
-            </div>
-          )}
-
-          <Button
-            onClick={handleUpload}
-            disabled={!file}
-            className="w-full h-12 text-base font-semibold gap-2"
+            {/* CTA */}
+            <button
+              onClick={handleUpload}
+              disabled={!file}
+              className="group relative w-full h-13 py-3.5 rounded-xl font-bold text-base text-white overflow-hidden disabled:opacity-40 disabled:cursor-not-allowed transition-all hover:shadow-lg hover:shadow-blue-200 active:scale-[0.98]"
+              style={{ background: "linear-gradient(135deg, #2563eb 0%, #4f46e5 100%)" }}
+            >
+              <span className="absolute inset-0 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-700"
+                style={{ background: "linear-gradient(90deg, transparent, rgba(255,255,255,0.18), transparent)" }} />
+              <span className="relative flex items-center justify-center gap-2.5">
+                <UploadIcon className="w-5 h-5 group-hover:scale-110 transition-transform" />
+                Upload & Extract
+              </span>
+            </button>
+          </motion.div>
+        ) : (
+          <motion.div
+            key="processing"
+            initial={{ opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.3 }}
           >
-            <UploadIcon className="w-5 h-5" />
-            Upload & Extract
-          </Button>
-        </div>
-      ) : (
-        <Card>
-          <CardContent className="p-8 space-y-6">
-            <div className="text-center space-y-2">
-              <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mx-auto animate-pulse">
-                <FileText className="w-8 h-8 text-primary" />
-              </div>
-              <h2 className="text-xl font-semibold">Processing your invoice</h2>
-              <p className="text-muted-foreground text-sm">{stepLabel}</p>
-            </div>
-
-            <Progress value={progress} className="h-2" />
-
-            <div className="grid grid-cols-4 gap-2">
-              {STEPS.map((s, i) => (
-                <div key={s} className="text-center">
-                  <div className={cn(
-                    "w-8 h-8 rounded-full flex items-center justify-center mx-auto mb-1 text-xs font-bold",
-                    i < step ? "bg-green-500 text-white" :
-                    i === step ? "bg-primary text-white animate-pulse" :
-                    "bg-muted text-muted-foreground"
-                  )}>
-                    {i < step ? "✓" : i + 1}
-                  </div>
-                  <p className="text-xs text-muted-foreground leading-tight">{s}</p>
+            <Card className="shadow-md shadow-black/[0.06]">
+              <CardContent className="p-8">
+                {/* Icon + title */}
+                <div className="text-center mb-8">
+                  <motion.div
+                    animate={{ rotate: 360 }}
+                    transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
+                    className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center mx-auto mb-4"
+                  >
+                    <Loader2 className="w-8 h-8 text-primary" />
+                  </motion.div>
+                  <h2 className="text-xl font-bold mb-1">Processing your invoice</h2>
+                  <p className="text-muted-foreground text-sm">{stepLabel}</p>
                 </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      )}
+
+                {/* Progress bar */}
+                <div className="mb-8">
+                  <div className="h-1.5 bg-muted rounded-full overflow-hidden">
+                    <motion.div
+                      className="h-full bg-gradient-to-r from-blue-500 to-indigo-500 rounded-full"
+                      animate={{ width: `${progress}%` }}
+                      transition={{ duration: 0.5, ease: "easeOut" }}
+                    />
+                  </div>
+                  <div className="text-right mt-1.5 text-xs text-muted-foreground">{progress}%</div>
+                </div>
+
+                {/* Steps */}
+                <div className="space-y-3">
+                  {STEPS.map((s, i) => {
+                    const done = i < step;
+                    const active = i === step;
+                    return (
+                      <motion.div
+                        key={s.label}
+                        initial={{ opacity: 0, x: -8 }}
+                        animate={{ opacity: i <= step ? 1 : 0.3, x: 0 }}
+                        transition={{ delay: i * 0.08 }}
+                        className="flex items-center gap-3"
+                      >
+                        <div className="w-7 h-7 rounded-full flex items-center justify-center shrink-0">
+                          <AnimatePresence mode="wait">
+                            {done ? (
+                              <motion.div key="done" initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ type: "spring", stiffness: 300 }}>
+                                <CheckCircle className="w-7 h-7 text-green-500" />
+                              </motion.div>
+                            ) : active ? (
+                              <motion.div key="active" className="w-7 h-7 rounded-full bg-primary flex items-center justify-center">
+                                <Loader2 className="w-4 h-4 text-white animate-spin" />
+                              </motion.div>
+                            ) : (
+                              <div key="idle" className="w-7 h-7 rounded-full border-2 border-muted-foreground/25 flex items-center justify-center">
+                                <span className="text-xs text-muted-foreground font-medium">{i + 1}</span>
+                              </div>
+                            )}
+                          </AnimatePresence>
+                        </div>
+                        <div>
+                          <p className={cn("text-sm font-medium", done ? "text-foreground" : active ? "text-primary" : "text-muted-foreground")}>
+                            {s.label}
+                          </p>
+                          {active && (
+                            <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-xs text-muted-foreground">
+                              {stepLabel || s.sublabel}
+                            </motion.p>
+                          )}
+                        </div>
+                      </motion.div>
+                    );
+                  })}
+                </div>
+              </CardContent>
+            </Card>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
