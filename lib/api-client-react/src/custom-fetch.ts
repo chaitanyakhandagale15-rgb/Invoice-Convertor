@@ -60,22 +60,18 @@ function isUrl(input: RequestInfo | URL): input is URL {
   return typeof URL !== "undefined" && input instanceof URL;
 }
 
-const API_BASE = (typeof process !== "undefined" && process.env.VITE_API_URL) || 
-                 (typeof import.meta !== "undefined" && import.meta.env && import.meta.env.VITE_API_URL) || 
-                 "";
-
 function applyBaseUrl(input: RequestInfo | URL): RequestInfo | URL {
   const url = resolveUrl(input);
   // Only prepend to relative paths (starting with /)
   if (!url.startsWith("/")) return input;
 
-  // Enforce VITE_API_URL or dynamically registered _baseUrl
-  const base = _baseUrl || API_BASE;
+  // Enforce dynamically registered _baseUrl
+  const base = _baseUrl;
   if (!base) {
     console.warn("customFetch: missing base URL for", url);
   }
 
-  const absolute = `${base}${url}`;
+  const absolute = `${base || ""}${url}`;
   if (typeof input === "string") return absolute;
   if (isUrl(input)) return new URL(absolute);
   return new Request(absolute, input as Request);
