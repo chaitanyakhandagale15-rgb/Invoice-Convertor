@@ -16,6 +16,7 @@ if (Number.isNaN(port) || port <= 0) {
 const dataDir = path.join(process.cwd(), "data");
 await fs.mkdir(path.join(dataDir, "uploads"), { recursive: true }).catch(() => {});
 await fs.mkdir(path.join(dataDir, "converted"), { recursive: true }).catch(() => {});
+await fs.mkdir(path.join(dataDir, "temp"), { recursive: true }).catch(() => {});
 
 app.listen(port, (err) => {
   if (err) {

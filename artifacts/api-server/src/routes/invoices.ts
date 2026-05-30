@@ -124,9 +124,9 @@ router.post("/", upload.single("file"), async (req: Request, res: Response): Pro
     await db.update(invoicesTable).set({ filePath }).where(eq(invoicesTable.id, invoice.id));
 
     res.status(201).json({ invoiceId: invoice.id, filePath, fileName: file.originalname });
-  } catch (err) {
-    req.log.error({ err }, "Upload error");
-    res.status(500).json({ error: "Failed to upload file" });
+  } catch (err: any) {
+    req.log.error({ err, stack: err.stack }, "Upload error during file processing");
+    res.status(500).json({ error: err.message || "Failed to upload file" });
   }
 });
 
