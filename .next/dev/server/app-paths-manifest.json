@@ -1,0 +1,7 @@
+{
+  "/api/convert/route": "app/api/convert/route.js",
+  "/api/download/[id]/route": "app/api/download/[id]/route.js",
+  "/api/extract/route": "app/api/extract/route.js",
+  "/api/invoices/route": "app/api/invoices/route.js",
+  "/api/upload/route": "app/api/upload/route.js"
+}
