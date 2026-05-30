@@ -147,6 +147,16 @@ function ClerkQueryClientCacheInvalidator() {
   return null;
 }
 
+import { setAuthTokenGetter } from "@workspace/api-client-react";
+
+function AuthTokenSetter() {
+  const { getToken } = useAuth();
+  useEffect(() => {
+    setAuthTokenGetter(() => getToken());
+  }, [getToken]);
+  return null;
+}
+
 function ProtectedRoute({ component: Component }: { component: ComponentType }) {
   return (
     <>
@@ -264,6 +274,7 @@ function ClerkProviderWithRoutes() {
     >
       <QueryClientProvider client={queryClient}>
         <ClerkQueryClientCacheInvalidator />
+        <AuthTokenSetter />
         <AppRouter />
         <Toaster richColors position="top-right" />
       </QueryClientProvider>

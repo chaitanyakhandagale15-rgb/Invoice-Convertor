@@ -12,8 +12,9 @@ import { extractInvoiceData } from "@/lib/ocr";
 import { SOURCE_COUNTRIES, type SourceCountry } from "@/lib/types";
 import type { ExtractedInvoice } from "@/lib/types";
 import { toast } from "sonner";
+import { useAuth } from "@clerk/react";
 
-const BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
+const BASE = import.meta.env.VITE_API_URL || import.meta.env.BASE_URL.replace(/\/$/, "");
 
 const STEPS = [
   { label: "Uploading file", sublabel: "Sending to server..." },
@@ -24,6 +25,7 @@ const STEPS = [
 
 export function Upload() {
   const [, navigate] = useLocation();
+  const { getToken } = useAuth();
   const [file, setFile] = useState<File | null>(null);
   const [dragOver, setDragOver] = useState(false);
   const [processing, setProcessing] = useState(false);
@@ -72,9 +74,14 @@ export function Upload() {
     setStepLabel("Uploading file...");
 
     try {
+      const token = await getToken();
       const formData = new FormData();
       formData.append("file", file);
-      const uploadRes = await fetch(`${BASE}/api/invoices`, { method: "POST", body: formData });
+      const uploadRes = await fetch(`${BASE}/api/invoices`, { 
+        method: "POST", 
+        body: formData,
+        headers: { Authorization: `Bearer ${token}` }
+      });
       if (!uploadRes.ok) {
         const text = await uploadRes.text();
         let errMsg = text;
@@ -116,7 +123,10 @@ export function Upload() {
 
       const extractRes = await fetch(`${BASE}/api/invoices/${invoiceId}/extract`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { 
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`
+        },
         body: JSON.stringify({ extractedData: extracted, sourceCountry }),
       });
       if (!extractRes.ok) {
