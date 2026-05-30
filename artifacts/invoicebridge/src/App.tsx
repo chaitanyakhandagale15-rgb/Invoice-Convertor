@@ -6,6 +6,7 @@ import { shadcn } from "@clerk/themes";
 import { QueryClient, QueryClientProvider, useQueryClient } from "@tanstack/react-query";
 import { Toaster } from "sonner";
 import { Navbar } from "@/components/Navbar";
+import { setBaseUrl } from "@workspace/api-client-react";
 import { Home } from "@/pages/Home";
 import { Upload } from "@/pages/Upload";
 import { Convert } from "@/pages/Convert";
@@ -21,6 +22,10 @@ const clerkPubKey = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY;
 
 // REQUIRED — copy verbatim. Empty in dev (intentional), auto-set in prod.
 const clerkProxyUrl = import.meta.env.VITE_CLERK_PROXY_URL;
+
+if (import.meta.env.VITE_API_URL) {
+  setBaseUrl(import.meta.env.VITE_API_URL);
+}
 
 const basePath = import.meta.env.BASE_URL.replace(/\/$/, "");
 
