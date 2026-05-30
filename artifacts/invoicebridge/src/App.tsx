@@ -23,9 +23,13 @@ const clerkPubKey = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY;
 // REQUIRED — copy verbatim. Empty in dev (intentional), auto-set in prod.
 const clerkProxyUrl = import.meta.env.VITE_CLERK_PROXY_URL;
 
-if (import.meta.env.VITE_API_URL) {
-  setBaseUrl(import.meta.env.VITE_API_URL);
+const API_BASE = import.meta.env.VITE_API_URL;
+
+if (!API_BASE) {
+  console.warn("VITE_API_URL is missing! API requests will fail if not proxied.");
 }
+
+setBaseUrl(API_BASE || "");
 
 const basePath = import.meta.env.BASE_URL.replace(/\/$/, "");
 

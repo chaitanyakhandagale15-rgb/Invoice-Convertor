@@ -13,9 +13,8 @@ import { SOURCE_COUNTRIES, type SourceCountry } from "@/lib/types";
 import type { ExtractedInvoice } from "@/lib/types";
 import { toast } from "sonner";
 import { useAuth } from "@clerk/react";
-import { customFetch } from "@workspace/api-client-react";
 
-const BASE = import.meta.env.VITE_API_URL || import.meta.env.BASE_URL.replace(/\/$/, "");
+const API_BASE = import.meta.env.VITE_API_URL;
 
 const STEPS = [
   { label: "Uploading file", sublabel: "Sending to server..." },
@@ -35,6 +34,7 @@ export function Upload() {
   const [error, setError] = useState("");
   const [sourceCountry, setSourceCountry] = useState<SourceCountry>("US");
   const fileRef = useRef<HTMLInputElement>(null);
+  const { getToken } = useAuth();
 
   const selectedCountry = SOURCE_COUNTRIES.find((c) => c.code === sourceCountry)!;
 
@@ -74,13 +74,22 @@ export function Upload() {
     setStepLabel("Uploading file...");
 
     try {
+      const token = await getToken();
       const formData = new FormData();
       formData.append("file", file);
       
-      const { invoiceId } = await customFetch<{ invoiceId: string }>("/api/invoices", { 
+      const uploadRes = await fetch(`${API_BASE}/api/invoices`, { 
         method: "POST", 
         body: formData,
+        headers: { Authorization: `Bearer ${token}` }
       });
+      if (!uploadRes.ok) {
+        const text = await uploadRes.text();
+        let errMsg = text;
+        try { errMsg = JSON.parse(text).error || text; } catch {}
+        throw new Error(errMsg || "Upload failed");
+      }
+      const { invoiceId } = await uploadRes.json();
       
       setProgress(15);
       setStep(1);
@@ -114,10 +123,20 @@ export function Upload() {
       setStep(2);
       setStepLabel("Saving extracted data...");
 
-      await customFetch(`/api/invoices/${invoiceId}/extract`, {
+      const extractRes = await fetch(`${API_BASE}/api/invoices/${invoiceId}/extract`, {
         method: "POST",
+        headers: { 
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`
+        },
         body: JSON.stringify({ extractedData: extracted, sourceCountry }),
       });
+      if (!extractRes.ok) {
+        const text = await extractRes.text();
+        let errMsg = text;
+        try { errMsg = JSON.parse(text).error || text; } catch {}
+        throw new Error(errMsg || "Failed to save extracted data");
+      }
 
       setProgress(100);
       setStep(3);
