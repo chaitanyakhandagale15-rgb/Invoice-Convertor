@@ -13,6 +13,7 @@ import { SOURCE_COUNTRIES, type SourceCountry } from "@/lib/types";
 import type { ExtractedInvoice } from "@/lib/types";
 import { toast } from "sonner";
 import { useAuth } from "@clerk/react";
+import { customFetch } from "@workspace/api-client-react";
 
 const BASE = import.meta.env.VITE_API_URL || import.meta.env.BASE_URL.replace(/\/$/, "");
 
@@ -25,7 +26,6 @@ const STEPS = [
 
 export function Upload() {
   const [, navigate] = useLocation();
-  const { getToken } = useAuth();
   const [file, setFile] = useState<File | null>(null);
   const [dragOver, setDragOver] = useState(false);
   const [processing, setProcessing] = useState(false);
@@ -74,21 +74,14 @@ export function Upload() {
     setStepLabel("Uploading file...");
 
     try {
-      const token = await getToken();
       const formData = new FormData();
       formData.append("file", file);
-      const uploadRes = await fetch(`${BASE}/api/invoices`, { 
+      
+      const { invoiceId } = await customFetch<{ invoiceId: string }>("/api/invoices", { 
         method: "POST", 
         body: formData,
-        headers: { Authorization: `Bearer ${token}` }
       });
-      if (!uploadRes.ok) {
-        const text = await uploadRes.text();
-        let errMsg = text;
-        try { errMsg = JSON.parse(text).error || text; } catch {}
-        throw new Error(errMsg || "Upload failed");
-      }
-      const { invoiceId } = await uploadRes.json();
+      
       setProgress(15);
       setStep(1);
 
@@ -121,20 +114,10 @@ export function Upload() {
       setStep(2);
       setStepLabel("Saving extracted data...");
 
-      const extractRes = await fetch(`${BASE}/api/invoices/${invoiceId}/extract`, {
+      await customFetch(`/api/invoices/${invoiceId}/extract`, {
         method: "POST",
-        headers: { 
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${token}`
-        },
         body: JSON.stringify({ extractedData: extracted, sourceCountry }),
       });
-      if (!extractRes.ok) {
-        const text = await extractRes.text();
-        let errMsg = text;
-        try { errMsg = JSON.parse(text).error || text; } catch {}
-        throw new Error(errMsg || "Failed to save extracted data");
-      }
 
       setProgress(100);
       setStep(3);
