@@ -76,8 +76,10 @@ export function Upload() {
       formData.append("file", file);
       const uploadRes = await fetch(`${BASE}/api/invoices`, { method: "POST", body: formData });
       if (!uploadRes.ok) {
-        const err = await uploadRes.json();
-        throw new Error(err.error || "Upload failed");
+        const text = await uploadRes.text();
+        let errMsg = text;
+        try { errMsg = JSON.parse(text).error || text; } catch {}
+        throw new Error(errMsg || "Upload failed");
       }
       const { invoiceId } = await uploadRes.json();
       setProgress(15);
@@ -117,7 +119,12 @@ export function Upload() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ extractedData: extracted, sourceCountry }),
       });
-      if (!extractRes.ok) throw new Error("Failed to save extracted data");
+      if (!extractRes.ok) {
+        const text = await extractRes.text();
+        let errMsg = text;
+        try { errMsg = JSON.parse(text).error || text; } catch {}
+        throw new Error(errMsg || "Failed to save extracted data");
+      }
 
       setProgress(100);
       setStep(3);

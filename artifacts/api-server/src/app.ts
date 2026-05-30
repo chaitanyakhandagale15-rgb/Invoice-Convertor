@@ -1,4 +1,4 @@
-import express, { type Express } from "express";
+import express, { type Express, type Request, type Response, type NextFunction } from "express";
 import cors from "cors";
 import pinoHttp from "pino-http";
 import { clerkMiddleware } from "@clerk/express";
@@ -51,5 +51,11 @@ app.use(
 );
 
 app.use("/api", router);
+
+// Global Error Handler to guarantee JSON responses
+app.use((err: any, req: Request, res: Response, next: NextFunction) => {
+  req.log.error({ err }, "Unhandled application error");
+  res.status(err.status || 500).json({ error: err.message || "Internal server error" });
+});
 
 export default app;
