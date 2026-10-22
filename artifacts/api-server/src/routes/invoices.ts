@@ -307,10 +307,12 @@ router.get("/:id/download", async (req: Request, res: Response): Promise<void> =
 
     const pdfBuffer = await readConvertedPDF(invoice.id);
     const invoiceNumber = (converted.convertedData as any)?.invoiceNumber ?? "GST-Invoice";
-
-    res.setHeader("Content-Type", "application/pdf");
-    res.setHeader("Content-Disposition", `attachment; filename="${invoiceNumber}.pdf"`);
-    res.send(pdfBuffer);
+    
+    // Return as Base64 JSON to completely bypass ANY binary proxy truncation bugs
+    res.json({
+      filename: `${invoiceNumber}.pdf`,
+      data: pdfBuffer.toString("base64")
+    });
   } catch (err) {
     req.log.error({ err }, "Download error");
     res.status(404).json({ error: "PDF not found" });

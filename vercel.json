@@ -1,0 +1,11 @@
+{
+  "buildCommand": "pnpm --filter @workspace/invoicebridge run build",
+  "outputDirectory": "artifacts/invoicebridge/dist",
+  "framework": "vite",
+  "rewrites": [
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
+    }
+  ]
+}

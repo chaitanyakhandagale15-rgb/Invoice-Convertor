@@ -1,5 +1,6 @@
 import { useParams } from "wouter";
 import { useGetInvoice } from "@workspace/api-client-react";
+import { useAuth } from "@clerk/react";
 import { Link } from "wouter";
 import { CheckCircle, Download, Upload, LayoutDashboard, Loader2, AlertCircle, Mail } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -24,6 +25,7 @@ const stagger = {
 export function DownloadPage() {
   const { id } = useParams<{ id: string }>();
   const { data: invoice, isLoading } = useGetInvoice(id);
+  const { getToken } = useAuth();
 
   // ─── Skeleton ─────────────────────────────────────────────────────────────
   if (isLoading) return (
@@ -207,17 +209,52 @@ export function DownloadPage() {
         {/* ── Action buttons ──────────────────────────────────────────────── */}
         <motion.div variants={stagger.item} className="space-y-3">
           {/* Primary: Download */}
-          <a href={`${BASE}/api/invoices/${id}/download`} download className="block">
-            <button className="group relative w-full h-14 rounded-xl font-bold text-base text-white overflow-hidden transition-all hover:shadow-lg hover:shadow-blue-200 active:scale-[0.98]"
-              style={{ background: "linear-gradient(135deg, #2563eb 0%, #4f46e5 100%)" }}>
-              <span className="absolute inset-0 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-700"
-                style={{ background: "linear-gradient(90deg, transparent, rgba(255,255,255,0.18), transparent)" }} />
-              <span className="relative flex items-center justify-center gap-2.5">
-                <Download className="w-5 h-5 group-hover:scale-110 transition-transform" />
-                Download GST Invoice PDF
-              </span>
-            </button>
-          </a>
+          <button 
+            onClick={async () => {
+              try {
+                const token = await getToken();
+                const response = await fetch(`/api/invoices/${id}/download`, {
+                  headers: { Authorization: `Bearer ${token}` }
+                });
+                
+                if (!response.ok) {
+                  throw new Error(`Server returned ${response.status}`);
+                }
+                
+                const json = await response.json();
+                if (!json.data || !json.filename) {
+                  throw new Error("Invalid base64 payload from server");
+                }
+
+                const byteCharacters = atob(json.data);
+                const byteNumbers = new Array(byteCharacters.length);
+                for (let i = 0; i < byteCharacters.length; i++) {
+                  byteNumbers[i] = byteCharacters.charCodeAt(i);
+                }
+                const byteArray = new Uint8Array(byteNumbers);
+                const blob = new Blob([byteArray], { type: 'application/pdf' });
+                
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement("a");
+                a.href = url;
+                a.download = json.filename;
+                document.body.appendChild(a);
+                a.click();
+                a.remove();
+                window.URL.revokeObjectURL(url);
+              } catch (err) {
+                console.error("Download failed:", err);
+              }
+            }}
+            className="group relative w-full h-14 rounded-xl font-bold text-base text-white overflow-hidden transition-all hover:shadow-lg hover:shadow-blue-200 active:scale-[0.98] block"
+            style={{ background: "linear-gradient(135deg, #2563eb 0%, #4f46e5 100%)" }}>
+            <span className="absolute inset-0 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-700"
+              style={{ background: "linear-gradient(90deg, transparent, rgba(255,255,255,0.18), transparent)" }} />
+            <span className="relative flex items-center justify-center gap-2.5">
+              <Download className="w-5 h-5 group-hover:scale-110 transition-transform" />
+              Download GST Invoice PDF
+            </span>
+          </button>
 
           {/* Secondary: Email (Coming Soon) */}
           <TooltipProvider>

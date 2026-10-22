@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useListInvoices, useDeleteInvoice, getListInvoicesQueryKey } from "@workspace/api-client-react";
+import { useAuth } from "@clerk/react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Link, useLocation } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
@@ -26,6 +27,9 @@ const statusColors: Record<string, string> = {
 export function Dashboard() {
   const queryClient = useQueryClient();
   const [, navigate] = useLocation();
+  const [page, setPage] = useState(1);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const { getToken } = useAuth();
   const { data, isLoading } = useListInvoices({ page: 1, limit: 20 });
   const deleteMutation = useDeleteInvoice();
   const [reconvertingId, setReconvertingId] = useState<string | null>(null);
@@ -227,11 +231,50 @@ export function Dashboard() {
                               )}
                               {invoice.status === "CONVERTED" && (
                                 <>
-                                  <a href={`/api/invoices/${invoice.id}/download`} download>
-                                    <Button variant="ghost" size="icon" className="h-7 w-7 text-primary" title="Download PDF">
-                                      <Download className="w-3.5 h-3.5" />
-                                    </Button>
-                                  </a>
+                                  <Button 
+                                    variant="ghost" 
+                                    size="icon" 
+                                    className="h-7 w-7 text-primary" 
+                                    title="Download PDF"
+                                    onClick={async () => {
+                                      try {
+                                        const token = await getToken();
+                                        const response = await fetch(`/api/invoices/${invoice.id}/download`, {
+                                          headers: { Authorization: `Bearer ${token}` }
+                                        });
+                                        
+                                        if (!response.ok) {
+                                          throw new Error(`Server returned ${response.status}`);
+                                        }
+                                        
+                                        const json = await response.json();
+                                        if (!json.data || !json.filename) {
+                                          throw new Error("Invalid base64 payload from server");
+                                        }
+                        
+                                        const byteCharacters = atob(json.data);
+                                        const byteNumbers = new Array(byteCharacters.length);
+                                        for (let i = 0; i < byteCharacters.length; i++) {
+                                          byteNumbers[i] = byteCharacters.charCodeAt(i);
+                                        }
+                                        const byteArray = new Uint8Array(byteNumbers);
+                                        const blob = new Blob([byteArray], { type: 'application/pdf' });
+                                        
+                                        const url = window.URL.createObjectURL(blob);
+                                        const a = document.createElement("a");
+                                        a.href = url;
+                                        a.download = json.filename;
+                                        document.body.appendChild(a);
+                                        a.click();
+                                        a.remove();
+                                        window.URL.revokeObjectURL(url);
+                                      } catch (err) {
+                                        console.error("Download failed:", err);
+                                      }
+                                    }}
+                                  >
+                                    <Download className="w-3.5 h-3.5" />
+                                  </Button>
                                   <Button
                                     variant="ghost"
                                     size="icon"

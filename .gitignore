@@ -20,6 +20,8 @@ node_modules
 data/uploads/
 data/converted/
 data/mock/
+artifacts/api-server/data/
+artifacts/**/data/
 
 # IDEs and editors
 /.idea
