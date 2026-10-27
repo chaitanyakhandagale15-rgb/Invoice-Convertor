@@ -13,8 +13,7 @@ import { SOURCE_COUNTRIES, type SourceCountry } from "@/lib/types";
 import type { ExtractedInvoice } from "@/lib/types";
 import { toast } from "sonner";
 import { useAuth } from "@clerk/react";
-
-const API_BASE = import.meta.env.VITE_API_URL;
+import { getApiUrl } from "@/lib/api";
 
 const STEPS = [
   { label: "Uploading file", sublabel: "Sending to server..." },
@@ -78,7 +77,7 @@ export function Upload() {
       const formData = new FormData();
       formData.append("file", file);
       
-      const uploadRes = await fetch(`${API_BASE}/api/invoices`, { 
+      const uploadRes = await fetch(getApiUrl("/api/invoices"), { 
         method: "POST", 
         body: formData,
         headers: { Authorization: `Bearer ${token}` }
@@ -123,7 +122,7 @@ export function Upload() {
       setStep(2);
       setStepLabel("Saving extracted data...");
 
-      const extractRes = await fetch(`${API_BASE}/api/invoices/${invoiceId}/extract`, {
+      const extractRes = await fetch(getApiUrl(`/api/invoices/${invoiceId}/extract`), {
         method: "POST",
         headers: { 
           "Content-Type": "application/json",

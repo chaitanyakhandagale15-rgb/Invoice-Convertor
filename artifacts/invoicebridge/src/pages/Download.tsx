@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useParams } from "wouter";
 import { useGetInvoice } from "@workspace/api-client-react";
 import { useAuth } from "@clerk/react";
@@ -11,8 +12,8 @@ import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/comp
 import { formatINR, getSourceCountry } from "@/lib/types";
 import type { SourceCountry } from "@/lib/types";
 import { motion } from "framer-motion";
-
-const BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
+import { toast } from "sonner";
+import { downloadInvoicePdf } from "@/lib/api";
 
 const stagger = {
   container: { animate: { transition: { staggerChildren: 0.1, delayChildren: 0.3 } } },
@@ -26,6 +27,7 @@ export function DownloadPage() {
   const { id } = useParams<{ id: string }>();
   const { data: invoice, isLoading } = useGetInvoice(id);
   const { getToken } = useAuth();
+  const [downloading, setDownloading] = useState(false);
 
   // ─── Skeleton ─────────────────────────────────────────────────────────────
   if (isLoading) return (
@@ -210,49 +212,33 @@ export function DownloadPage() {
         <motion.div variants={stagger.item} className="space-y-3">
           {/* Primary: Download */}
           <button 
+            disabled={downloading}
             onClick={async () => {
+              if (!id) return;
+              setDownloading(true);
               try {
                 const token = await getToken();
-                const response = await fetch(`/api/invoices/${id}/download`, {
-                  headers: { Authorization: `Bearer ${token}` }
-                });
-                
-                if (!response.ok) {
-                  throw new Error(`Server returned ${response.status}`);
-                }
-                
-                const json = await response.json();
-                if (!json.data || !json.filename) {
-                  throw new Error("Invalid base64 payload from server");
-                }
-
-                const byteCharacters = atob(json.data);
-                const byteNumbers = new Array(byteCharacters.length);
-                for (let i = 0; i < byteCharacters.length; i++) {
-                  byteNumbers[i] = byteCharacters.charCodeAt(i);
-                }
-                const byteArray = new Uint8Array(byteNumbers);
-                const blob = new Blob([byteArray], { type: 'application/pdf' });
-                
-                const url = window.URL.createObjectURL(blob);
-                const a = document.createElement("a");
-                a.href = url;
-                a.download = json.filename;
-                document.body.appendChild(a);
-                a.click();
-                a.remove();
-                window.URL.revokeObjectURL(url);
-              } catch (err) {
+                const invoiceNum = (invoice as any)?.converted?.convertedData?.invoiceNumber || invoice?.fileName || "GST-Invoice";
+                await downloadInvoicePdf(id, token, `${invoiceNum}.pdf`);
+                toast.success("PDF downloaded successfully!");
+              } catch (err: any) {
                 console.error("Download failed:", err);
+                toast.error(err.message || "Failed to download PDF");
+              } finally {
+                setDownloading(false);
               }
             }}
-            className="group relative w-full h-14 rounded-xl font-bold text-base text-white overflow-hidden transition-all hover:shadow-lg hover:shadow-blue-200 active:scale-[0.98] block"
+            className="group relative w-full h-14 rounded-xl font-bold text-base text-white overflow-hidden transition-all hover:shadow-lg hover:shadow-blue-200 active:scale-[0.98] block disabled:opacity-75"
             style={{ background: "linear-gradient(135deg, #2563eb 0%, #4f46e5 100%)" }}>
             <span className="absolute inset-0 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-700"
               style={{ background: "linear-gradient(90deg, transparent, rgba(255,255,255,0.18), transparent)" }} />
             <span className="relative flex items-center justify-center gap-2.5">
-              <Download className="w-5 h-5 group-hover:scale-110 transition-transform" />
-              Download GST Invoice PDF
+              {downloading ? (
+                <Loader2 className="w-5 h-5 animate-spin" />
+              ) : (
+                <Download className="w-5 h-5 group-hover:scale-110 transition-transform" />
+              )}
+              {downloading ? "Preparing PDF..." : "Download GST Invoice PDF"}
             </span>
           </button>
 

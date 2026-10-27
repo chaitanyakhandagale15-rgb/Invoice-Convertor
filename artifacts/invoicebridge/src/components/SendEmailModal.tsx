@@ -6,8 +6,8 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Loader2, Mail, Send } from "lucide-react";
 import { toast } from "sonner";
-
-const BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
+import { useAuth } from "@clerk/react";
+import { getApiUrl } from "@/lib/api";
 
 interface SendEmailModalProps {
   invoiceId: string;
@@ -20,6 +20,7 @@ export function SendEmailModal({ invoiceId, open, onClose }: SendEmailModalProps
   const [subject, setSubject] = useState("Converted GST Invoice — InvoiceBridge");
   const [message, setMessage] = useState("");
   const [sending, setSending] = useState(false);
+  const { getToken } = useAuth();
 
   const isValidEmail = (email: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 
@@ -31,9 +32,13 @@ export function SendEmailModal({ invoiceId, open, onClose }: SendEmailModalProps
 
     setSending(true);
     try {
-      const res = await fetch(`${BASE}/api/invoices/${invoiceId}/send-email`, {
+      const token = await getToken();
+      const res = await fetch(getApiUrl(`/api/invoices/${invoiceId}/send-email`), {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
         body: JSON.stringify({ recipientEmail, subject, message }),
       });
 

@@ -23,18 +23,13 @@ const clerkPubKey = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY;
 // REQUIRED — copy verbatim. Empty in dev (intentional), auto-set in prod.
 const clerkProxyUrl = import.meta.env.VITE_CLERK_PROXY_URL;
 
-const API_BASE = import.meta.env.VITE_API_URL;
+import { API_BASE } from "@/lib/api";
 
 if (!API_BASE && import.meta.env.PROD) {
   console.warn("VITE_API_URL is missing! API requests will fail if not proxied.");
 }
 
-// In development, we use the Vite proxy (empty string) to avoid CORS issues entirely.
-// In production, we use VITE_API_URL.
-const isDev = import.meta.env.DEV;
-const finalBase = isDev ? "" : (API_BASE && API_BASE !== "undefined" ? API_BASE : "");
-
-setBaseUrl(finalBase);
+setBaseUrl(API_BASE);
 
 const basePath = import.meta.env.BASE_URL.replace(/\/$/, "");
 

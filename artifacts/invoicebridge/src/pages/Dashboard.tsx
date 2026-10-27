@@ -4,7 +4,7 @@ import { useAuth } from "@clerk/react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Link, useLocation } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
-import { FileCheck, IndianRupee, Calendar, TrendingUp, Download, Trash2, Upload, FileText, RefreshCw } from "lucide-react";
+import { FileCheck, IndianRupee, Calendar, TrendingUp, Download, Trash2, Upload, FileText, RefreshCw, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -12,8 +12,7 @@ import { formatINR, getSourceCountry, SOURCE_COUNTRIES } from "@/lib/types";
 import type { SourceCountry } from "@/lib/types";
 import { format } from "date-fns";
 import { toast } from "sonner";
-
-const BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
+import { downloadInvoicePdf, getApiUrl } from "@/lib/api";
 
 const statusColors: Record<string, string> = {
   UPLOADED: "bg-yellow-100 text-yellow-700",
@@ -33,6 +32,7 @@ export function Dashboard() {
   const { data, isLoading } = useListInvoices({ page: 1, limit: 20 });
   const deleteMutation = useDeleteInvoice();
   const [reconvertingId, setReconvertingId] = useState<string | null>(null);
+  const [downloadingId, setDownloadingId] = useState<string | null>(null);
 
   const stats = data?.stats;
 
@@ -50,7 +50,11 @@ export function Dashboard() {
   const handleReconvert = async (id: string) => {
     setReconvertingId(id);
     try {
-      const res = await fetch(`${BASE}/api/invoices/${id}/reset`, { method: "POST" });
+      const token = await getToken();
+      const res = await fetch(getApiUrl(`/api/invoices/${id}/reset`), {
+        method: "POST",
+        headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+      });
       if (!res.ok) throw new Error("Reset failed");
       await queryClient.invalidateQueries({ queryKey: getListInvoicesQueryKey() });
       toast.success("Ready to re-convert");
@@ -236,44 +240,27 @@ export function Dashboard() {
                                     size="icon" 
                                     className="h-7 w-7 text-primary" 
                                     title="Download PDF"
+                                    disabled={downloadingId === invoice.id}
                                     onClick={async () => {
+                                      setDownloadingId(invoice.id);
                                       try {
                                         const token = await getToken();
-                                        const response = await fetch(`/api/invoices/${invoice.id}/download`, {
-                                          headers: { Authorization: `Bearer ${token}` }
-                                        });
-                                        
-                                        if (!response.ok) {
-                                          throw new Error(`Server returned ${response.status}`);
-                                        }
-                                        
-                                        const json = await response.json();
-                                        if (!json.data || !json.filename) {
-                                          throw new Error("Invalid base64 payload from server");
-                                        }
-                        
-                                        const byteCharacters = atob(json.data);
-                                        const byteNumbers = new Array(byteCharacters.length);
-                                        for (let i = 0; i < byteCharacters.length; i++) {
-                                          byteNumbers[i] = byteCharacters.charCodeAt(i);
-                                        }
-                                        const byteArray = new Uint8Array(byteNumbers);
-                                        const blob = new Blob([byteArray], { type: 'application/pdf' });
-                                        
-                                        const url = window.URL.createObjectURL(blob);
-                                        const a = document.createElement("a");
-                                        a.href = url;
-                                        a.download = json.filename;
-                                        document.body.appendChild(a);
-                                        a.click();
-                                        a.remove();
-                                        window.URL.revokeObjectURL(url);
-                                      } catch (err) {
+                                        const invoiceNum = (invoice as any)?.converted?.convertedData?.invoiceNumber || invoice.fileName || "invoice";
+                                        await downloadInvoicePdf(invoice.id, token, `${invoiceNum}.pdf`);
+                                        toast.success("PDF downloaded!");
+                                      } catch (err: any) {
                                         console.error("Download failed:", err);
+                                        toast.error(err.message || "Failed to download PDF");
+                                      } finally {
+                                        setDownloadingId(null);
                                       }
                                     }}
                                   >
-                                    <Download className="w-3.5 h-3.5" />
+                                    {downloadingId === invoice.id ? (
+                                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                    ) : (
+                                      <Download className="w-3.5 h-3.5" />
+                                    )}
                                   </Button>
                                   <Button
                                     variant="ghost"

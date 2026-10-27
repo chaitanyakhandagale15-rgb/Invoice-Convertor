@@ -25,8 +25,7 @@ import type { ExtractedInvoice, ConversionOptions, LineItem } from "@/lib/types"
 import { toast } from "sonner";
 import { ConversionAnimation } from "@/components/ConversionAnimation";
 import { AnimatedNumber } from "@/components/AnimatedNumber";
-
-const BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
+import { getApiUrl } from "@/lib/api";
 
 interface LiveRate {
   rate: number;
@@ -36,7 +35,7 @@ interface LiveRate {
 
 async function fetchExchangeRate(currency: string): Promise<LiveRate | null> {
   try {
-    const res = await fetch(`${BASE}/api/exchange-rates/${currency}`);
+    const res = await fetch(getApiUrl(`/api/exchange-rates/${currency}`));
     if (!res.ok) return null;
     return await res.json();
   } catch {
