@@ -305,7 +305,16 @@ router.get("/:id/download", async (req: Request, res: Response): Promise<void> =
       return;
     }
 
-    const pdfBuffer = await readConvertedPDF(invoice.id);
+    let pdfBuffer: Buffer;
+    try {
+      pdfBuffer = await readConvertedPDF(invoice.id);
+    } catch {
+      req.log.info({ invoiceId: invoice.id }, "PDF not found on disk, regenerating from convertedData");
+      pdfBuffer = await generateGSTInvoicePDF(converted.convertedData as any);
+      // Cache back to disk (best effort)
+      saveConvertedPDF(pdfBuffer, invoice.id).catch(() => {});
+    }
+
     const invoiceNumber = (converted.convertedData as any)?.invoiceNumber ?? "GST-Invoice";
     
     // Return as Base64 JSON to completely bypass ANY binary proxy truncation bugs
@@ -315,7 +324,7 @@ router.get("/:id/download", async (req: Request, res: Response): Promise<void> =
     });
   } catch (err) {
     req.log.error({ err }, "Download error");
-    res.status(404).json({ error: "PDF not found" });
+    res.status(500).json({ error: "Failed to generate or retrieve PDF" });
   }
 });
 
