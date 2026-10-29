@@ -1,11 +1,6 @@
 <div align="center">
 
-<img src="https://readme-typing-svg.demolab.com?font=Fira+Code&size=32&duration=3000&pause=1000&color=FF6B35&center=true&vCenter=true&width=600&lines=🧾+InvoiceBridge;Multi-Country+GST+Converter;PDF+%2B+OCR+%2B+Live+Rates;Built+for+Indian+Compliance" alt="InvoiceBridge Typing Animation" />
-
-<br/>
-
-**Convert global invoices into fully compliant Indian GST invoices**  
-*Browser-side OCR · Live exchange rates · Server-generated PDFs · Multi-country tax normalization*
+<img src=".github/assets/banner.svg" alt="InvoiceBridge — Multi-Country GST Invoice Converter" width="100%"/>
 
 <br/>
 
