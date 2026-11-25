@@ -345,7 +345,7 @@ pnpm --filter @workspace/invoicebridge run dev
 | `GET` | `/api/invoices/:id/download` | ✅ | Download GST PDF as Base64 JSON |
 | `POST` | `/api/invoices/:id/reset` | ✅ | Reset CONVERTED → EXTRACTED for re-conversion |
 | `POST` | `/api/invoices/:id/send-email` | ✅ | Send invoice by email (coming soon) |
-| `GET` | `/api/health` | ❌ | Health check |
+| `GET` | `/api/healthz` | ❌ | Health check |
 
 ### Pagination Response Shape
 
